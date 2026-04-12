@@ -83,11 +83,14 @@ st.markdown("""
         text-shadow: 1px 1px 3px rgba(0,0,0,1.0);
     }
 
-    /* Streamlit標準パーツの隠蔽 */
-    header {visibility: hidden;}
+    /* 💡 修正：メニューボタンを消さないようにヘッダー隠蔽を調整 */
     footer {visibility: hidden;}
     [data-testid="stDecoration"] {display: none;}
-    [data-testid="stHeader"] {display: none;}
+    
+    /* ヘッダー全体を消すのではなく、背景を透明にしてボタンだけ残す */
+    [data-testid="stHeader"] {
+        background: transparent !important;
+    }
 
     /* ==========================================
        📱 モバイル表示（スマホ）の2列強制・絶対命令
@@ -109,7 +112,7 @@ st.markdown("""
             gap: 0 !important;
         }
 
-        /* 各カラム要素を確実に50%幅で固定する（100%への拡大を阻止） */
+        /* 各カラム要素を確実に50%幅で固定する */
         div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
             width: 50% !important;
             flex: 0 0 50% !important;
@@ -130,7 +133,7 @@ st.markdown("""
         }
         
         .product-image-container {
-            height: 150px !important; /* スマホ2列時に適切なアスペクト比を維持 */
+            height: 150px !important;
         }
     }
 
@@ -389,7 +392,7 @@ if st.session_state.generated:
     else:
         st.caption(f"【コンパクトモード】 {len(filtered)} 品番 / {int(total_q)} 点")
 
-    # 👇 コンパクトモードでも常にQRコードとHTML保存を表示
+    # コンパクトモードでも常にQRコードとHTML保存を表示
     st.markdown("<h3 class='no-print'>📱 スマホ転送・出力</h3>", unsafe_allow_html=True)
     btn1, btn2 = st.columns(2)
     with btn1:
