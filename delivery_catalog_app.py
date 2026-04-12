@@ -31,24 +31,24 @@ st.markdown("""
         font-size: 2.8rem !important;
         font-weight: 900 !important;
         color: #ffffff !important;
-        text-shadow: 2px 2px 8px rgba(0,0,0,0.8), 0 0 20px rgba(0,0,0,0.4) !important;
+        text-shadow: 3px 3px 10px rgba(0,0,0,1.0), 0 0 25px rgba(0,0,0,0.6) !important;
         margin-top: 1.5rem !important;
         margin-bottom: 1.5rem !important;
         text-align: left;
-        border-left: 10px solid #ffffff;
+        border-left: 12px solid #ffffff;
         padding-left: 20px;
     }
 
     /* 2. 商品名称の視認性向上 */
     .product-title {
         font-weight: 800;
-        font-size: 0.95rem;
+        font-size: 1.0rem;
         line-height: 1.2;
         height: 2.4em;
         overflow: hidden;
         margin-bottom: 4px;
         color: #ffffff !important;
-        text-shadow: 1px 1px 3px rgba(0,0,0,0.9) !important;
+        text-shadow: 2px 2px 4px rgba(0,0,0,1.0) !important;
     }
 
     /* 3. 画像のズレ防止（等高コンテナ） */
@@ -61,7 +61,7 @@ st.markdown("""
         border: 1px solid #333;
         overflow: hidden;
         margin-bottom: 8px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.5);
     }
 
     /* 画像をハッキリ表示（薄さを解消） */
@@ -75,12 +75,12 @@ st.markdown("""
 
     .product-details {
         font-size: 0.75rem;
-        color: #cccccc !important;
+        color: #e0e0e0 !important;
         line-height: 1.3;
         height: 3.9em;
         overflow: hidden;
         margin-bottom: 8px;
-        text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+        text-shadow: 1px 1px 3px rgba(0,0,0,1.0);
     }
 
     /* Streamlit UI隠蔽 */
@@ -135,7 +135,7 @@ def generate_html_report(items):
     html_content += f"</div><p style='text-align:center;font-size:0.6rem;'>出力:{now_str}</p></body></html>"
     return html_content
 
-# --- 検索ロジック (Bing/楽天) ---
+# --- 検索ロジック ---
 def is_valid_adidas_img(url):
     keywords = ["adidas", "yimg", "bing", "gstatic", "shop-adidas", "mm-adidas"]
     return any(k in url.lower() for k in keywords)
@@ -312,12 +312,16 @@ if st.session_state.generated:
         c1, c2 = st.columns(2)
         with c1:
             unique_bs = sorted(list(set([i["bs"] for i in items if i.get("bs")])))
-            def set_all_bs(state):
-                for b in unique_bs: st.session_state[f"chk_{b}"] = state
+            
+            # 👇 プルダウン（マルチセレクト）形式に修正
+            def select_all(): st.session_state.bs_ms = unique_bs
+            def deselect_all(): st.session_state.bs_ms = []
+
             bc1, bc2 = st.columns(2)
-            bc1.button("全て選択", on_click=set_all_bs, args=(True,), use_container_width=True)
-            bc2.button("全て解除", on_click=set_all_bs, args=(False,), use_container_width=True)
-            sel_bs = [b for b in unique_bs if st.checkbox(b, key=f"chk_{b}")]
+            bc1.button("全て選択", on_click=select_all, use_container_width=True)
+            bc2.button("全て解除", on_click=deselect_all, use_container_width=True)
+            
+            sel_bs = st.multiselect("カテゴリーを選択 (BS)", unique_bs, key="bs_ms")
             if sel_bs: filtered = [i for i in filtered if i["bs"] in sel_bs]
         with c2:
             if st.toggle("✨ 新規入荷のみ"):
