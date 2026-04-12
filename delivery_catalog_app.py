@@ -224,6 +224,7 @@ with st.sidebar:
         st.download_button("データを保存 (.json)", json_string, "catalog_backup.json", "application/json", use_container_width=True)
     
     if st.session_state.generated:
+        # 👇 リセットボタンを押すとポップアップが出るように変更
         if st.button("🗑️ リセット", type="primary", use_container_width=True):
             confirm_reset()
 
@@ -338,7 +339,19 @@ if st.session_state.generated:
         sid = st.session_state.get("share_id", uuid.uuid4().hex[:8])
         st.session_state.share_id = sid
         get_shared_store()[sid] = filtered
-        st.components.v1.html(f"""<div id="qrcode" style="background:white;padding:10px;border-radius:8px;"></div><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script><script>var url = window.parent.location.href.split('?')[0] + "?sid={sid}"; new QRCode(document.getElementById("qrcode"), {{text:url, width:128, height:128}});</script>""", height=160)
+        # 👇 【修正点】QRコードを表示するHTMLのレイアウトを修正し、中央寄せにして謎のスペースを排除した。
+        qr_html = f"""
+        <div style="display:flex; justify-content:center; align-items:center;">
+            <div id="qrcode" style="background:white;padding:10px;border-radius:8px; display:inline-block;"></div>
+        </div>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+        <script>
+            var baseUrl = window.parent.location.href.split('?')[0];
+            var url = baseUrl + "?sid={sid}";
+            new QRCode(document.getElementById("qrcode"), {{text:url, width:128, height:128}});
+        </script>
+        """
+        st.components.v1.html(qr_html, height=160)
 
     # --- カタログ表示本体 ---
     num_cols = 4 if is_print_mode else 3
