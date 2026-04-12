@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import requests
@@ -367,8 +366,13 @@ if st.session_state.generated:
         if selected_bs: filtered_items = [item for item in filtered_items if item["bs"] in selected_bs]
 
     with f_col2:
+        # 👇 フィルタロジックを強化: #N/A, #REF!, NaN(空)を確実にキャッチ
         if st.toggle("✨ 新規入荷のみ"):
-            filtered_items = [item for item in filtered_items if str(item["status"]).strip().upper() in ["#N/A", "#REF!", ""]]
+            error_vals = ["#N/A", "#REF!", "NAN", "NONE", "", "NULL"]
+            filtered_items = [
+                item for item in filtered_items 
+                if str(item.get("status", "")).strip().upper() in error_vals or pd.isna(item.get("status"))
+            ]
     
     st.markdown("<h3 class='no-print'>📱 スマホ転送</h3>", unsafe_allow_html=True)
     col_dl, col_qr = st.columns(2)
