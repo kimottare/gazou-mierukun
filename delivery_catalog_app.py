@@ -8,15 +8,16 @@ import os
 import concurrent.futures
 import datetime
 import socket 
-import uuid       # 追加：短いIDを作るため
+import uuid
 
 # --- 🌟 楽天アプリID ---
 RAKUTEN_APP_ID = "9fd3dd97-a071-4e2b-8579-dec02ea27217" 
 AUTO_SAVE_FILE = "auto_save_catalog.json" 
-SHARED_DIR = "shared_catalog_data" # 共有用の一時保存フォルダ
 
-if not os.path.exists(SHARED_DIR):
-    os.makedirs(SHARED_DIR)
+# 👇 追加：PCとスマホ間でデータを一瞬で受け渡しするための「共有メモリ」
+@st.cache_resource
+def get_shared_store():
+    return {}
 
 st.set_page_config(page_title="商品画像見える君", layout="wide")
 
@@ -188,7 +189,7 @@ def save_auto_save_data(items):
 # ==========================================
 st.title("📦 商品画像見える君")
 
-# 👇 追加：スマホでQRを読み込んだ時のデータ復元処理（ファイルから読み込む方式）
+# 👇 スマホでQRを読み込んだ時のデータ復元処理（共有メモリから取得）
 if "generated" not in st.session_state:
     st.session_state.catalog_items = []
     st.session_state.generated = False
@@ -196,15 +197,15 @@ if "generated" not in st.session_state:
     if "sid" in st.query_params:
         try:
             sid = st.query_params["sid"]
-            filepath = os.path.join(SHARED_DIR, f"data_{sid}.json")
-            if os.path.exists(filepath):
-                with open(filepath, "r", encoding="utf-8") as f:
-                    loaded_items = json.load(f)
-                st.session_state.catalog_items = loaded_items
+            shared_store = get_shared_store()
+            
+            # 共有メモリからデータを取り出す
+            if sid in shared_store:
+                st.session_state.catalog_items = shared_store[sid]
                 st.session_state.generated = True
                 st.success("✅ スマホへカタログの転送が完了しました！")
             else:
-                st.warning("⚠️ データが見つかりません。PC側でもう一度QRコードを作成してください。")
+                st.warning("⚠️ データが見つかりません。PCの画面を開いたまま、もう一度QRコードを読み取ってください。")
         except Exception as e:
             st.error("データの読み込みに失敗しました。")
             
@@ -247,7 +248,6 @@ with st.sidebar:
             st.session_state.generated = False
             st.session_state.catalog_items = []
             if os.path.exists(AUTO_SAVE_FILE): os.remove(AUTO_SAVE_FILE)
-            # URLパラメータもリセットする
             st.query_params.clear()
             st.rerun()
 
@@ -308,7 +308,6 @@ if not st.session_state.generated:
             if st.button("作成", type="primary", use_container_width=True):
                 display_df = df[df[code_col].astype(str).str.strip() != ""]
                 
-                # --- 追加：サイズと数量の集計処理 ---
                 aggregated_sizes = {}
                 aggregated_qtys = {}
                 
@@ -349,7 +348,6 @@ if not st.session_state.generated:
                     aggregated_qtys[code_str] = t_q_str if total_qty > 0 else ""
 
                 display_df = display_df.drop_duplicates(subset=[code_col])
-                # --- 集計処理ここまで ---
                 
                 st.info(f"自動検索中... ({len(display_df)}件)")
                 p_bar = st.progress(0)
@@ -359,7 +357,6 @@ if not st.session_state.generated:
                     idx_num, row = args
                     code, name = str(row[code_col]).strip(), str(row[name_col]).strip()
                     bs_val = str(row[bs_col]).strip() if bs_col != "(なし)" else ""
-                    # 個別の行からではなく、集計した辞書から取得するよう変更
                     size_val = aggregated_sizes.get(code, "")
                     qty_val = aggregated_qtys.get(code, "")
                     st_val = str(row[status_col]).strip() if status_col != "(なし)" else ""
@@ -400,13 +397,11 @@ if st.session_state.generated:
     items = st.session_state.catalog_items
     filtered_items = items
     
-    # 👇 印刷時は非表示にするクラス(no-print)を各テキストに追加しました
     st.markdown("<h3 class='no-print' style='margin-top: 1rem;'>🎯 リストの絞り込み</h3>", unsafe_allow_html=True)
     f_col1, f_col2 = st.columns(2)
     
     with f_col1:
         unique_bs = sorted(list(set([item["bs"] for item in items if item.get("bs") and str(item["bs"]).lower() != 'nan'])))
-        # 👇 プルダウンから、スクロール枠付きのチェックボックスリストに変更
         st.markdown("<p class='no-print' style='font-size:0.9rem; font-weight:bold; margin-bottom:0.5rem;'>カテゴリー(BS)で絞り込む</p>", unsafe_allow_html=True)
         selected_bs = []
         if unique_bs:
@@ -425,7 +420,6 @@ if st.session_state.generated:
             filtered_items = [item for item in filtered_items if str(item["status"]).strip().upper() in error_vals]
         else:
             unique_status = sorted(list(set([item["status"] for item in items if item.get("status")])))
-            # 👇 プルダウンから、スクロール枠付きのチェックボックスリストに変更
             st.markdown("<p class='no-print' style='font-size:0.9rem; font-weight:bold; margin-bottom:0.5rem;'>手動で在庫状況を絞り込む</p>", unsafe_allow_html=True)
             selected_status = []
             if unique_status:
@@ -456,7 +450,7 @@ if st.session_state.generated:
         st.markdown("<p class='no-print' style='font-size: 0.8rem; color: #666;'>保存されたHTMLファイルを共有フォルダ等経由でスマホに送ります。</p>", unsafe_allow_html=True)
             
     with col_qr:
-        # 👇 変更：一時ファイルに保存して、短い「鍵(ID)」だけをQRコードにする方式
+        # 👇 変更：メモリ共有方式に最適化したQRコード生成
         st.markdown("<p class='no-print' style='font-weight: bold; margin-bottom: 0.5rem;'>方法2: QRコードでスマホに転送する (Wi-Fi不要!)</p>", unsafe_allow_html=True)
         
         try:
@@ -465,13 +459,12 @@ if st.session_state.generated:
                 st.session_state.share_id = uuid.uuid4().hex[:8]
             
             sid = st.session_state.share_id
-            filepath = os.path.join(SHARED_DIR, f"data_{sid}.json")
             
-            # PC側のクラウド上にデータを書き込んでおく
-            with open(filepath, "w", encoding="utf-8") as f:
-                json.dump(filtered_items, f, ensure_ascii=False)
+            # PC側の「共有メモリ」にデータを書き込んでおく
+            shared_store = get_shared_store()
+            shared_store[sid] = filtered_items
             
-            st.markdown("<p class='no-print' style='font-size: 0.8rem; color: #666;'>※4G/5G回線でもOK！iPhoneの標準カメラで一瞬で読み取れます。</p>", unsafe_allow_html=True)
+            st.markdown("<p class='no-print' style='font-size: 0.8rem; color: #666;'>※PC側の画面はこのまま開いておいてください。<br>※4G/5G回線のiPhoneカメラで読み取れます。</p>", unsafe_allow_html=True)
             
             qr_html = f"""
             <div style="display: flex; justify-content: left; align-items: center; background: transparent; padding: 5px;">
@@ -479,14 +472,19 @@ if st.session_state.generated:
             </div>
             <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
             <script>
-                // 現在のURL（クエリパラメータ抜き）を取得
-                var baseUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-                // データの中身ではなく、短いID(鍵)だけをURLにつける
+                var baseUrl = "";
+                try {{
+                    // 親ウィンドウのURLを取得（Streamlit環境に対応）
+                    baseUrl = window.parent.location.href.split('?')[0];
+                }} catch(e) {{
+                    // 取得できない場合は現在のURLをフォールバック
+                    baseUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+                }}
                 var fullUrl = baseUrl + "?sid={sid}";
                 
                 new QRCode(document.getElementById("qrcode"), {{
                     text: fullUrl,
-                    width: 160, // サイズも少し小さくして見やすくしました
+                    width: 160,
                     height: 160,
                     colorDark : "#000000",
                     colorLight : "#ffffff",
