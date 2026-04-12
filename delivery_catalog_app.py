@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import requests
@@ -48,6 +47,29 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# ==========================================
+# 削除確認用ダイアログ
+# ==========================================
+@st.dialog("データの全消去")
+def confirm_reset():
+    st.warning("現在表示されているリストと保存データをすべて削除します。よろしいですか？")
+    st.write("※この操作は取り消せません。")
+    
+    col1, col2 = st.columns(2)
+    if col1.button("はい、削除します", type="primary", use_container_width=True):
+        st.session_state.generated = False
+        st.session_state.catalog_items = []
+        if os.path.exists(AUTO_SAVE_FILE): 
+            os.remove(AUTO_SAVE_FILE)
+        st.query_params.clear()
+        st.rerun()
+    
+    if col2.button("いいえ、戻ります", use_container_width=True):
+        st.rerun()
+
+# ==========================================
+# ロジック・ヘルパー関数
+# ==========================================
 def generate_html_report(items):
     now_str = datetime.datetime.now().strftime("%Y年%m月%d日 %H:%M")
     html_content = f"""
@@ -200,13 +222,10 @@ with st.sidebar:
     if st.session_state.generated:
         json_string = json.dumps(st.session_state.catalog_items, ensure_ascii=False, indent=2)
         st.download_button("データを保存 (.json)", json_string, "catalog_backup.json", "application/json", use_container_width=True)
+    
     if st.session_state.generated:
         if st.button("🗑️ リセット", type="primary", use_container_width=True):
-            st.session_state.generated = False
-            st.session_state.catalog_items = []
-            if os.path.exists(AUTO_SAVE_FILE): os.remove(AUTO_SAVE_FILE)
-            st.query_params.clear()
-            st.rerun()
+            confirm_reset()
 
 if not st.session_state.generated:
     st.subheader("📝 新規リストを作成")
@@ -292,20 +311,19 @@ if st.session_state.generated:
     with c1:
         unique_bs = sorted(list(set([i["bs"] for i in items if i.get("bs")])))
         
-        # 👇 修正：全てを選択・全てを解除ボタンの追加
+        # 👇 修正：コールバック関数(on_click)を使って、1回のクリックで確実に反映させる
+        def set_all_bs(state):
+            for b in unique_bs:
+                st.session_state[f"chk_{b}"] = state
+
         btn_col1, btn_col2 = st.columns(2)
-        if btn_col1.button("全て選択", use_container_width=True, key="sel_all"):
-            for b in unique_bs: st.session_state[f"chk_{b}"] = True
-            st.rerun()
-        if btn_col2.button("全て解除", use_container_width=True, key="unsel_all"):
-            for b in unique_bs: st.session_state[f"chk_{b}"] = False
-            st.rerun()
+        btn_col1.button("全て選択", use_container_width=True, on_click=set_all_bs, args=(True,))
+        btn_col2.button("全て解除", use_container_width=True, on_click=set_all_bs, args=(False,))
             
         sel_bs = []
         if unique_bs:
             with st.container(height=150):
                 for b in unique_bs:
-                    # session_stateを介してチェック状態を管理
                     if st.checkbox(b, key=f"chk_{b}"): sel_bs.append(b)
         if sel_bs: filtered = [i for i in filtered if i["bs"] in sel_bs]
         
