@@ -6,8 +6,8 @@ import time
 import json 
 import os 
 import concurrent.futures
-import datetime # 🌟 HTML出力の作成日時のために追加
-import socket # 🌟 スマホ接続用IPアドレス取得のため追加
+import datetime
+import socket 
 
 # --- 🌟 楽天アプリID ---
 RAKUTEN_APP_ID = "9fd3dd97-a071-4e2b-8579-dec02ea27217" 
@@ -29,10 +29,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 🌟 スマホ閲覧用のHTMLファイルを生成する関数
 def generate_html_report(items):
     now_str = datetime.datetime.now().strftime("%Y年%m月%d日 %H:%M")
-    
     html_content = f"""
     <!DOCTYPE html>
     <html lang="ja">
@@ -43,7 +41,6 @@ def generate_html_report(items):
         <style>
             body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; padding: 10px; margin: 0; }}
             h1 {{ text-align: center; color: #1a1a1a; font-size: 1.3rem; margin: 10px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #333; }}
-            /* スマホでは2列、PCでは4列の自動可変グリッド */
             .grid-container {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }}
             @media (min-width: 600px) {{ .grid-container {{ grid-template-columns: repeat(3, 1fr); }} }}
             @media (min-width: 900px) {{ .grid-container {{ grid-template-columns: repeat(4, 1fr); }} }}
@@ -61,13 +58,11 @@ def generate_html_report(items):
         <h1>📦 商品カタログ ({len(items)}件)</h1>
         <div class="grid-container">
     """
-    
     for item in items:
         img_url = item.get("manual_url") if item.get("manual_url") else item.get("auto_url")
         img_html = f'<div class="img-container"><img src="{img_url}" loading="lazy"></div>' if img_url else '<div class="no-img">画像なし</div>'
         status = item.get("status", "")
         status_html = f'<div class="status">{status}</div>' if status else ""
-        
         html_content += f"""
             <div class="card">
                 {img_html}
@@ -76,7 +71,6 @@ def generate_html_report(items):
                 {status_html}
             </div>
         """
-        
     html_content += f"""
         </div>
         <div class="footer">作成日時: {now_str}</div>
@@ -86,15 +80,13 @@ def generate_html_report(items):
     return html_content
 
 def get_local_ip():
-    """🌟 PCのローカルIPアドレスを自動取得する関数"""
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
         ip = s.getsockname()[0]
         s.close()
         return ip
-    except:
-        return "localhost"
+    except: return "localhost"
 
 def is_valid_adidas_img(url):
     keywords = ["adidas", "yimg", "bing", "gstatic", "shop-adidas", "mm-adidas"]
@@ -200,7 +192,6 @@ if "generated" not in st.session_state:
         st.session_state.catalog_items = []
         st.session_state.generated = False
 
-# --- 🌟 サイドバー設定 ---
 with st.sidebar:
     st.header("⚙️ 設定・管理")
     is_print_mode = st.toggle("印刷用コンパクト表示モード", help="URL入力やリンクを隠し、画像を小さくして紙を節約します。")
@@ -234,7 +225,6 @@ with st.sidebar:
             if os.path.exists(AUTO_SAVE_FILE): os.remove(AUTO_SAVE_FILE)
             st.rerun()
 
-# --- 🌟 データがない時（初期画面） ---
 if not st.session_state.generated:
     st.subheader("📝 新しいリストから作成")
     uploaded_file = st.file_uploader("ExcelまたはCSVファイルをアップロード", type=['xlsx', 'xlsm', 'csv'])
@@ -323,7 +313,6 @@ if not st.session_state.generated:
                 st.rerun() 
         except Exception as e: st.error(f"エラー: {e}")
 
-# --- 🌟 カタログ表示エリア ---
 if st.session_state.generated:
     items = st.session_state.catalog_items
     filtered_items = items
@@ -340,7 +329,9 @@ if st.session_state.generated:
     with f_col2:
         is_new_only = st.toggle("✨ 新規入荷（#N/A, #REF!）のみを表示")
         if is_new_only:
-            filtered_items = [item for item in filtered_items if item["status"] in ["#N/A", "#REF!"]]
+            # Pandas変換後の nan や None、空白も新規入荷とみなすように条件を拡張
+            error_vals = ["#N/A", "#REF!", "NAN", "NONE", ""]
+            filtered_items = [item for item in filtered_items if str(item["status"]).strip().upper() in error_vals]
         else:
             unique_status = sorted(list(set([item["status"] for item in items if item.get("status")])))
             selected_status = st.multiselect("手動で在庫状況を絞り込む", options=unique_status)
@@ -349,7 +340,6 @@ if st.session_state.generated:
     
     st.write("---")
     
-    # 🌟 スマホ閲覧用の連携セクション！
     st.subheader("📱 スマホでカタログを見る")
     col_dl, col_qr = st.columns([1, 1])
     
@@ -372,7 +362,6 @@ if st.session_state.generated:
         app_url = f"http://{local_ip}:8501"
         st.caption("※PCとスマホが同じ社内Wi-Fiに繋がっている必要があります。")
         
-        # QRコードを画面上に表示するための処理
         qr_html = f"""
         <div style="display: flex; justify-content: left; align-items: center; background: transparent; padding: 5px;">
             <div id="qrcode" style="background: white; padding: 10px; border-radius: 8px; border: 1px solid #ddd; display: inline-block;"></div>
