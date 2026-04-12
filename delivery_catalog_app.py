@@ -8,12 +8,15 @@ import os
 import concurrent.futures
 import datetime
 import socket 
-import zlib       # 追加：データを圧縮するため
-import base64     # 追加：データをURLに変換するため
+import uuid       # 追加：短いIDを作るため
 
 # --- 🌟 楽天アプリID ---
 RAKUTEN_APP_ID = "9fd3dd97-a071-4e2b-8579-dec02ea27217" 
 AUTO_SAVE_FILE = "auto_save_catalog.json" 
+SHARED_DIR = "shared_catalog_data" # 共有用の一時保存フォルダ
+
+if not os.path.exists(SHARED_DIR):
+    os.makedirs(SHARED_DIR)
 
 st.set_page_config(page_title="商品画像見える君", layout="wide")
 
@@ -29,7 +32,6 @@ st.markdown("""
             padding-top: 1rem !important;
             padding-bottom: 0rem !important;
         }
-        /* 👇ここから追加：背景を強制的に白、文字を黒にする */
         body, .stApp, .main, .block-container, div[data-testid="stAppViewContainer"] {
             background-color: white !important;
             background-image: none !important;
@@ -186,22 +188,23 @@ def save_auto_save_data(items):
 # ==========================================
 st.title("📦 商品画像見える君")
 
-# 👇 追加：スマホでQRを読み込んだ時のデータ復元処理
+# 👇 追加：スマホでQRを読み込んだ時のデータ復元処理（ファイルから読み込む方式）
 if "generated" not in st.session_state:
     st.session_state.catalog_items = []
     st.session_state.generated = False
 
-    if "d" in st.query_params:
+    if "sid" in st.query_params:
         try:
-            # URLから圧縮されたデータを受け取り、解凍してリストに戻す
-            b64_str = st.query_params["d"]
-            compressed = base64.urlsafe_b64decode(b64_str.encode('utf-8'))
-            json_str = zlib.decompress(compressed).decode('utf-8')
-            loaded_items = json.loads(json_str)
-            
-            st.session_state.catalog_items = loaded_items
-            st.session_state.generated = True
-            st.success("✅ スマホへカタログの転送が完了しました！")
+            sid = st.query_params["sid"]
+            filepath = os.path.join(SHARED_DIR, f"data_{sid}.json")
+            if os.path.exists(filepath):
+                with open(filepath, "r", encoding="utf-8") as f:
+                    loaded_items = json.load(f)
+                st.session_state.catalog_items = loaded_items
+                st.session_state.generated = True
+                st.success("✅ スマホへカタログの転送が完了しました！")
+            else:
+                st.warning("⚠️ データが見つかりません。PC側でもう一度QRコードを作成してください。")
         except Exception as e:
             st.error("データの読み込みに失敗しました。")
             
@@ -453,16 +456,22 @@ if st.session_state.generated:
         st.markdown("<p class='no-print' style='font-size: 0.8rem; color: #666;'>保存されたHTMLファイルを共有フォルダ等経由でスマホに送ります。</p>", unsafe_allow_html=True)
             
     with col_qr:
-        # 👇 変更：社内ネットワーク専用から、どこからでもアクセスできるURL圧縮QR方式に変更！
+        # 👇 変更：一時ファイルに保存して、短い「鍵(ID)」だけをQRコードにする方式
         st.markdown("<p class='no-print' style='font-weight: bold; margin-bottom: 0.5rem;'>方法2: QRコードでスマホに転送する (Wi-Fi不要!)</p>", unsafe_allow_html=True)
         
         try:
-            # データを圧縮してBase64化
-            json_str = json.dumps(filtered_items)
-            compressed = zlib.compress(json_str.encode('utf-8'))
-            b64_str = base64.urlsafe_b64encode(compressed).decode('utf-8')
+            # 短い一意のIDを作成
+            if "share_id" not in st.session_state:
+                st.session_state.share_id = uuid.uuid4().hex[:8]
             
-            st.markdown("<p class='no-print' style='font-size: 0.8rem; color: #666;'>※4G/5G回線でもOK！iPhoneの標準カメラで読み取ってください。<br>（※一度に転送する件数が多いとQRが細かくなり読み取れない場合があります）</p>", unsafe_allow_html=True)
+            sid = st.session_state.share_id
+            filepath = os.path.join(SHARED_DIR, f"data_{sid}.json")
+            
+            # PC側のクラウド上にデータを書き込んでおく
+            with open(filepath, "w", encoding="utf-8") as f:
+                json.dump(filtered_items, f, ensure_ascii=False)
+            
+            st.markdown("<p class='no-print' style='font-size: 0.8rem; color: #666;'>※4G/5G回線でもOK！iPhoneの標準カメラで一瞬で読み取れます。</p>", unsafe_allow_html=True)
             
             qr_html = f"""
             <div style="display: flex; justify-content: left; align-items: center; background: transparent; padding: 5px;">
@@ -472,12 +481,12 @@ if st.session_state.generated:
             <script>
                 // 現在のURL（クエリパラメータ抜き）を取得
                 var baseUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-                // 圧縮データをURLのお尻にくっつける
-                var fullUrl = baseUrl + "?d={b64_str}";
+                // データの中身ではなく、短いID(鍵)だけをURLにつける
+                var fullUrl = baseUrl + "?sid={sid}";
                 
                 new QRCode(document.getElementById("qrcode"), {{
                     text: fullUrl,
-                    width: 160,
+                    width: 160, // サイズも少し小さくして見やすくしました
                     height: 160,
                     colorDark : "#000000",
                     colorLight : "#ffffff",
@@ -488,7 +497,7 @@ if st.session_state.generated:
             import streamlit.components.v1 as components
             components.html(qr_html, height=200)
         except Exception as e:
-            st.error("QRコードの作成に失敗しました。")
+            st.error(f"QRコードの作成に失敗しました: {e}")
     
     st.markdown("<hr class='no-print'>", unsafe_allow_html=True)
 
