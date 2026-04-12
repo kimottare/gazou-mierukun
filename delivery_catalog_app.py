@@ -22,62 +22,70 @@ def get_shared_store():
 st.set_page_config(page_title="商品画像見える君", layout="wide")
 
 # ==========================================
-# 🎨 CSS：画面表示 & 印刷用の最強レイアウト
+# 🎨 最強の印刷・表示用CSS
 # ==========================================
 st.markdown("""
     <style>
-    /* 共通：不要なStreamlitパーツの隠蔽 */
     header {visibility: hidden;}
     footer {visibility: hidden;}
     [data-testid="stDecoration"] {display: none;}
     [data-testid="stHeader"] {display: none;}
 
-    /* 画面表示用の調整 */
-    .main .block-container {
-        padding-top: 1rem !important;
-        padding-bottom: 1rem !important;
+    /* 画面表示：カタログカードのスタイル */
+    .product-title {
+        font-weight: 800;
+        font-size: 1.1rem;
+        line-height: 1.2;
+        margin-bottom: 4px;
+        color: #1a1a1a;
+    }
+    .product-details {
+        font-size: 0.85rem;
+        color: #444;
+        line-height: 1.4;
+        margin-bottom: 8px;
     }
 
-    /* 印刷時の設定（ここを徹底強化） */
+    /* 印刷時の設定 */
     @media print {
-        /* サイドバー、ツールバー、ボタン、入力欄、QRコード、説明文などをすべて消去 */
+        /* 不要な要素を完全に消去 */
         header, [data-testid="stSidebar"], [data-testid="stToolbar"], 
         .stButton, .stDownloadButton, [data-testid="stExpander"],
         [data-testid="stMultiSelect"], [data-testid="stCheckbox"], 
-        .no-print, .stTabs, iframe, .stTextInput, .stAlert, hr {
+        .no-print, .stTabs, iframe, .stTextInput, .stAlert, hr, .stMarkdown div[data-testid="stCaptionContainer"] {
             display: none !important;
         }
 
-        /* コンテンツエリアを紙面いっぱいに広げる */
         .main .block-container {
             max-width: 100% !important;
             padding: 0 !important;
             margin: 0 !important;
         }
 
-        /* 商品カードの改ページ制御 */
         div[data-testid="column"] {
             break-inside: avoid;
             page-break-inside: avoid;
+            padding: 5px !important;
         }
 
-        /* 背景色や画像を強制的に印刷（ブラウザ設定によるが可能な限り） */
         body {
             background-color: white !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
         }
+        
+        /* 印刷時はURL入力欄などを消すための調整 */
+        .stTextInput { display: none !important; }
     }
     </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 削除確認用ダイアログ
+# 削除確認ダイアログ
 # ==========================================
 @st.dialog("データの全消去")
 def confirm_reset():
     st.warning("現在表示されているリストと保存データをすべて削除します。よろしいですか？")
-    st.write("※この操作は取り消せません。")
     col1, col2 = st.columns(2)
     if col1.button("はい、削除します", type="primary", use_container_width=True):
         st.session_state.generated = False
@@ -89,15 +97,15 @@ def confirm_reset():
         st.rerun()
 
 # ==========================================
-# ロジック・ヘルパー関数
+# ヘルパー関数群
 # ==========================================
 def generate_html_report(items):
     now_str = datetime.datetime.now().strftime("%Y年%m月%d日 %H:%M")
-    html_content = f"""<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>商品カタログ</title><style>body {{ font-family: sans-serif; padding: 20px; }} .grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }} .card {{ border: 1px solid #eee; padding: 10px; border-radius: 8px; }} .img-box {{ height: 180px; display: flex; justify-content: center; align-items: center; }} img {{ max-height: 100%; max-width: 100%; object-fit: contain; }} .code {{ font-size: 0.8rem; color: #666; }}</style></head><body><h1>📦 商品カタログ ({len(items)}件)</h1><div class="grid">"""
+    html_content = f"""<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>商品カタログ</title><style>body {{ font-family: sans-serif; padding: 20px; }} .grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; }} .card {{ border: 1px solid #ddd; padding: 12px; border-radius: 8px; break-inside: avoid; }} .img-box {{ height: 180px; display: flex; justify-content: center; align-items: center; margin-bottom: 8px; }} img {{ max-height: 100%; max-width: 100%; object-fit: contain; }} .title {{ font-weight: bold; font-size: 1rem; margin-bottom: 4px; }} .details {{ font-size: 0.8rem; color: #333; line-height: 1.4; }}</style></head><body><h1>📦 商品カタログ ({len(items)}件)</h1><div class="grid">"""
     for item in items:
         url = item.get("manual_url") or item.get("auto_url") or ""
-        html_content += f'<div class="card"><div class="img-box"><img src="{url}"></div><div style="font-weight:bold; font-size:0.9rem;">{item.get("name","")}</div><div class="code">Art: {item.get("code","")}<br>Qty: {item.get("qty","")} / BS: {item.get("bs","")}</div></div>'
-    html_content += f"</div><p style='text-align:center; font-size:0.7rem;'>作成日時: {now_str}</p></body></html>"
+        html_content += f'<div class="card"><div class="img-box"><img src="{url}"></div><div class="title">{item.get("name","")}</div><div class="details">{item.get("code","")} / {item.get("size","")} / {item.get("qty","")}点 / {item.get("status","")}</div></div>'
+    html_content += f"</div><p style='text-align:center; font-size:0.7rem; margin-top:30px;'>作成日時: {now_str}</p></body></html>"
     return html_content
 
 def is_valid_adidas_img(url):
@@ -156,7 +164,7 @@ def save_auto_save_data(items):
     except: pass 
 
 # ==========================================
-# メイン UI 
+# メイン UI
 # ==========================================
 st.title("📦 商品画像見える君")
 
@@ -183,7 +191,6 @@ with st.sidebar:
     concurrency = st.slider("⚡ 画像取得スピード", 1, 10, 3)
     is_print_mode = st.toggle("印刷用コンパクト表示モード", value=False)
     
-    # 👇 印刷実行：親ウィンドウを対象にするように修正
     if st.button("🖨️ 今すぐ印刷する", use_container_width=True, type="primary"):
         components.html("<script>window.parent.print();</script>", height=0)
 
@@ -204,7 +211,6 @@ if not st.session_state.generated:
                 except: df = pd.read_csv(uploaded_file, na_filter=False, dtype=str, header=None, encoding='cp932')
             else: df = pd.read_excel(uploaded_file, na_filter=False, dtype=str, header=None)
             
-            # ヘッダー検知（画像のバグ修正：型変換を安全に）
             header_idx = 0
             for i, row in df.iterrows():
                 row_vals = [str(v) for v in row if v is not None]
@@ -241,8 +247,11 @@ if not st.session_state.generated:
                         except: q_num = 0
                         total_qty += q_num
                         if s_val: size_dict[s_val] = size_dict.get(s_val, 0) + q_num
-                    agg_sizes[code_str] = ", ".join([f"{s}({int(q) if q==int(q) else q})" for s, q in size_dict.items()])
-                    agg_qtys[code_str] = str(int(total_qty) if total_qty == int(total_qty) else total_qty) if total_qty > 0 else ""
+                    
+                    # 写真通りのサイズ内訳文字列を生成
+                    size_list = [f"{s}({int(q) if q==int(q) else q})" for s, q in size_dict.items()]
+                    agg_sizes[code_str] = ", ".join(size_list)
+                    agg_qtys[code_str] = str(int(total_qty) if total_qty == int(total_qty) else total_qty)
 
                 display_df = display_df.drop_duplicates(subset=[code_col])
                 st.info(f"自動検索中... ({len(display_df)}件)")
@@ -275,7 +284,7 @@ if st.session_state.generated:
     items = st.session_state.catalog_items
     filtered = items
     
-    # 👇 コンパクトモード時は作業UIを非表示
+    # 印刷モード時は作業用UIを隠す
     if not is_print_mode:
         st.markdown("<h3 class='no-print'>🎯 絞り込み</h3>", unsafe_allow_html=True)
         c1, c2 = st.columns(2)
@@ -296,9 +305,8 @@ if st.session_state.generated:
             if st.toggle("✨ 新規入荷のみ"):
                 filtered = [i for i in filtered if str(i.get("status", "")).strip().upper() in ["#N/A", "#REF!", "NAN", "NONE", ""]]
 
-        # カウンター & スマホ転送
         total_q = sum([float(i.get("qty",0)) if i.get("qty") else 0 for i in filtered])
-        st.info(f"📦 現在の表示: **{len(filtered)}** 品番 / 合計数量: **{int(total_q) if total_q==int(total_q) else total_q}** 点")
+        st.info(f"📦 表示: **{len(filtered)}** 品番 / 合計: **{int(total_q)}** 点")
         
         st.markdown("<h3 class='no-print'>📱 スマホ転送</h3>", unsafe_allow_html=True)
         cdl, cqr = st.columns(2)
@@ -309,27 +317,27 @@ if st.session_state.generated:
             qr_html = f'<div style="display:flex; justify-content:center;"><div id="qrcode" style="background:white;padding:10px;border-radius:8px;"></div></div><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script><script>var url = window.parent.location.href.split("?")[0] + "?sid={sid}"; new QRCode(document.getElementById("qrcode"), {{text:url, width:128, height:128}});</script>'
             components.html(qr_html, height=160)
     else:
-        # コンパクトモード時：カウンターを非常に控えめに表示
         total_q = sum([float(i.get("qty",0)) if i.get("qty") else 0 for i in filtered])
-        st.caption(f"表示中: {len(filtered)} 品番 / {int(total_q)} 点")
+        st.caption(f"カタログ出力中: {len(filtered)} 品番 / {int(total_q)} 点")
 
-    # --- カタログ表示本体 ---
+    # --- 商品リスト表示 ---
     num_cols = 4 if is_print_mode else 3
     img_h = "160px" if is_print_mode else "280px"
     for i in range(0, len(filtered), num_cols):
         cols = st.columns(num_cols) 
         for j, item in enumerate(filtered[i:i+num_cols]):
             with cols[j]:
-                # タイトルと情報
-                st.markdown(f"**{item['name']}**")
-                st.caption(f"{item['code']} / {item['size']} / {item['qty']}点 / {item['status']}")
+                # 品名・詳細（ここを写真 通りに強化）
+                st.markdown(f'<div class="product-title">{item["name"]}</div>', unsafe_allow_html=True)
+                detail_str = f"{item['code']} / {item['size']} / {item.get('qty','0')}点 / {item['status']}"
+                st.markdown(f'<div class="product-details">{detail_str}</div>', unsafe_allow_html=True)
                 
-                # 画像
+                # 画像表示
                 url = item.get("manual_url") or item.get("auto_url")
-                if url: st.markdown(f'<div style="height:{img_h};display:flex;justify-content:center;background:#fff;border-radius:6px;border:1px solid #eee;overflow:hidden;"><img src="{url}" style="max-height:100%;max-width:100%;object-fit:contain;"></div>', unsafe_allow_html=True)
-                else: st.markdown(f'<div style="height:{img_h};display:flex;justify-content:center;align-items:center;background:#f8f9fa;border-radius:6px;border:1px solid #ddd;color:#999;">画像なし</div>', unsafe_allow_html=True)
+                if url: st.markdown(f'<div style="height:{img_h};display:flex;justify-content:center;background:#fff;border-radius:6px;border:1px solid #eee;overflow:hidden;margin-bottom:8px;"><img src="{url}" style="max-height:100%;max-width:100%;object-fit:contain;"></div>', unsafe_allow_html=True)
+                else: st.markdown(f'<div style="height:{img_h};display:flex;justify-content:center;align-items:center;background:#f8f9fa;border-radius:6px;border:1px solid #ddd;color:#999;margin-bottom:8px;">画像なし</div>', unsafe_allow_html=True)
                 
-                # コンパクトモード以外：編集UI
+                # 作業用UI（印刷・コンパクトモード時は非表示）
                 if not is_print_mode:
                     st.markdown(f"🔍 [Google検索](https://www.google.com/search?tbm=isch&q=adidas+{item['code']})")
                     new_u = st.text_input("URL貼り付け", value=item.get("manual_url", ""), key=f"inp_{item['code']}")
