@@ -224,7 +224,6 @@ with st.sidebar:
         st.download_button("データを保存 (.json)", json_string, "catalog_backup.json", "application/json", use_container_width=True)
     
     if st.session_state.generated:
-        # 👇 リセットボタンを押すとポップアップが出るように変更
         if st.button("🗑️ リセット", type="primary", use_container_width=True):
             confirm_reset()
 
@@ -311,11 +310,8 @@ if st.session_state.generated:
     
     with c1:
         unique_bs = sorted(list(set([i["bs"] for i in items if i.get("bs")])))
-        
-        # 👇 修正：コールバック関数(on_click)を使って、1回のクリックで確実に反映させる
         def set_all_bs(state):
-            for b in unique_bs:
-                st.session_state[f"chk_{b}"] = state
+            for b in unique_bs: st.session_state[f"chk_{b}"] = state
 
         btn_col1, btn_col2 = st.columns(2)
         btn_col1.button("全て選択", use_container_width=True, on_click=set_all_bs, args=(True,))
@@ -332,6 +328,17 @@ if st.session_state.generated:
         if st.toggle("✨ 新規入荷のみ"):
             filtered = [i for i in filtered if str(i.get("status", "")).strip().upper() in ["#N/A", "#REF!", "NAN", "NONE", "", "NULL"]]
     
+    # 👇 ここを追加：表示件数と合計数量のカウンター
+    total_q_sum = 0
+    for item in filtered:
+        try:
+            q_val = float(item.get("qty", 0)) if item.get("qty") else 0
+            total_q_sum += q_val
+        except: pass
+    total_q_display = int(total_q_sum) if total_q_sum == int(total_q_sum) else total_q_sum
+    
+    st.info(f"📦 現在の表示: **{len(filtered)}** 品番 / 合計数量: **{total_q_display}** 点")
+    
     st.markdown("<h3 class='no-print'>📱 スマホ転送</h3>", unsafe_allow_html=True)
     cdl, cqr = st.columns(2)
     with cdl: st.download_button("HTML保存", generate_html_report(filtered), "catalog.html", "text/html", use_container_width=True)
@@ -339,7 +346,6 @@ if st.session_state.generated:
         sid = st.session_state.get("share_id", uuid.uuid4().hex[:8])
         st.session_state.share_id = sid
         get_shared_store()[sid] = filtered
-        # 👇 【修正点】QRコードを表示するHTMLのレイアウトを修正し、中央寄せにして謎のスペースを排除した。
         qr_html = f"""
         <div style="display:flex; justify-content:center; align-items:center;">
             <div id="qrcode" style="background:white;padding:10px;border-radius:8px; display:inline-block;"></div>
@@ -362,9 +368,7 @@ if st.session_state.generated:
             with cols[j]:
                 st.markdown(f"**{item['name']}**")
                 st.caption(f"{item['code']} / {item['size']} / {item['qty']}点 / {item['status']}")
-                
                 disp_url = item.get("manual_url") if item.get("manual_url") else item.get("auto_url")
-                
                 if disp_url: st.markdown(f'<div style="height:{img_h};display:flex;justify-content:center;background:#fff;border-radius:6px;border:1px solid #eee;overflow:hidden;"><img src="{disp_url}" style="max-height:100%;max-width:100%;object-fit:contain;"></div>', unsafe_allow_html=True)
                 else: st.markdown(f'<div style="height:{img_h};display:flex;justify-content:center;align-items:center;background:#f8f9fa;border-radius:6px;border:1px solid #ddd;color:#999;">画像なし</div>', unsafe_allow_html=True)
                 
@@ -375,6 +379,5 @@ if st.session_state.generated:
                         item["manual_url"] = new_url
                         save_auto_save_data(st.session_state.catalog_items)
                         st.rerun()
-                    
                     if item.get('source'): st.caption(f"元:{item['source']}")
                     st.write("---")
