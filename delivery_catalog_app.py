@@ -63,11 +63,15 @@ def generate_html_report(items):
         img_html = f'<div class="img-container"><img src="{img_url}" loading="lazy"></div>' if img_url else '<div class="no-img">画像なし</div>'
         status = item.get("status", "")
         status_html = f'<div class="status">{status}</div>' if status else ""
+        
+        size_str = f" / Size: {item.get('size', '')}" if item.get('size') else ""
+        qty_str = f" / Qty: {item.get('qty', '')}" if item.get('qty') else ""
+        
         html_content += f"""
             <div class="card">
                 {img_html}
                 <p class="title">{item.get("name", "")}</p>
-                <p class="details">Art: {item.get("code", "")}<br>BS: {item.get("bs", "")}</p>
+                <p class="details">Art: {item.get("code", "")}<br>BS: {item.get("bs", "")}{size_str}{qty_str}</p>
                 {status_html}
             </div>
         """
@@ -265,6 +269,13 @@ if not st.session_state.generated:
             name_col = st.selectbox("Nameの列", columns, index=guess_column_index(columns, ['商品名称', 'name', 'item']))
             bs_col_idx = guess_column_index(columns, ['bs', 'category'])
             bs_col = st.selectbox("BSの列", ["(なし)"] + columns, index=bs_col_idx+1)
+            
+            size_col_idx = guess_column_index(columns, ['size', 'サイズ'])
+            size_col = st.selectbox("サイズ(Size)の列", ["(なし)"] + columns, index=size_col_idx+1)
+            
+            qty_col_idx = guess_column_index(columns, ['qty', 'quantity', '数量', '出荷数量'])
+            qty_col = st.selectbox("数量(Qty)の列", ["(なし)"] + columns, index=qty_col_idx+1)
+            
             status_col = st.selectbox("Status(在庫状況)の列", ["(なし)"] + columns, index=len(columns))
             
             if st.button("全件の画像を取得して作成", use_container_width=True):
@@ -279,13 +290,15 @@ if not st.session_state.generated:
                     idx_num, row = args
                     code, name = str(row[code_col]).strip(), str(row[name_col]).strip()
                     bs_val = str(row[bs_col]).strip() if bs_col != "(なし)" else ""
+                    size_val = str(row[size_col]).strip() if size_col != "(なし)" else ""
+                    qty_val = str(row[qty_col]).strip() if qty_col != "(なし)" else ""
                     st_val = str(row[status_col]).strip() if status_col != "(なし)" else ""
                     
                     if not code or code.lower() == 'nan' or code.lower() == 'none': return idx_num, None
                     img_info = get_best_image(code, name)
                     
                     return idx_num, {
-                        "code": code, "name": name, "bs": bs_val, "status": st_val, 
+                        "code": code, "name": name, "bs": bs_val, "size": size_val, "qty": qty_val, "status": st_val, 
                         "auto_url": img_info["url"] if img_info else None, 
                         "source": img_info["source"] if img_info else None, "manual_url": ""
                     }
@@ -397,10 +410,14 @@ if st.session_state.generated:
                 with cols[j]:
                     if is_print_mode:
                         st.markdown(f"<p style='font-size:0.9rem; font-weight:bold; margin-bottom:0;'>{name}</p>", unsafe_allow_html=True)
-                        st.caption(f"{code} / {item.get('status', '')}")
+                        size_str = f" / {item.get('size', '')}" if item.get('size') else ""
+                        qty_str = f" / {item.get('qty', '')}点" if item.get('qty') else ""
+                        st.caption(f"{code}{size_str}{qty_str} / {item.get('status', '')}")
                     else:
                         st.markdown(f"<b><span style='font-size:1.2rem;'>{name}</span></b>", unsafe_allow_html=True)
-                        st.caption(f"Art: {code} / BS: {item.get('bs', '')} / Status: {item.get('status', '')}")
+                        size_str = f" / Size: {item.get('size', '')}" if item.get('size') else ""
+                        qty_str = f" / Qty: {item.get('qty', '')}" if item.get('qty') else ""
+                        st.caption(f"Art: {code} / BS: {item.get('bs', '')}{size_str}{qty_str} / Status: {item.get('status', '')}")
                     
                     input_key = f"manual_url_{code}"
                     if not is_print_mode:
