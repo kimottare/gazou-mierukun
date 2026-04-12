@@ -295,7 +295,7 @@ if not st.session_state.generated:
                 status_col = st.selectbox("Status(在庫状況)の列", ["(なし)"] + columns, index=len(columns))
             # 👆 ここまで変更
             
-            if st.button("全件の画像を取得して作成", use_container_width=True):
+            if st.button("作成", type="primary", use_container_width=True):
                 display_df = df[df[code_col].astype(str).str.strip() != ""]
                 
                 # --- 追加：サイズと数量の集計処理 ---
@@ -396,7 +396,15 @@ if st.session_state.generated:
     
     with f_col1:
         unique_bs = sorted(list(set([item["bs"] for item in items if item.get("bs") and str(item["bs"]).lower() != 'nan'])))
-        selected_bs = st.multiselect("カテゴリー(BS)で絞り込む", options=unique_bs)
+        # 👇 プルダウンから、スクロール枠付きのチェックボックスリストに変更
+        st.markdown("<p class='no-print' style='font-size:0.9rem; font-weight:bold; margin-bottom:0.5rem;'>カテゴリー(BS)で絞り込む</p>", unsafe_allow_html=True)
+        selected_bs = []
+        if unique_bs:
+            with st.container(height=200):
+                for bs in unique_bs:
+                    if st.checkbox(bs, key=f"chk_bs_{bs}"):
+                        selected_bs.append(bs)
+                        
         if selected_bs:
             filtered_items = [item for item in filtered_items if item["bs"] in selected_bs]
 
@@ -407,7 +415,15 @@ if st.session_state.generated:
             filtered_items = [item for item in filtered_items if str(item["status"]).strip().upper() in error_vals]
         else:
             unique_status = sorted(list(set([item["status"] for item in items if item.get("status")])))
-            selected_status = st.multiselect("手動で在庫状況を絞り込む", options=unique_status)
+            # 👇 プルダウンから、スクロール枠付きのチェックボックスリストに変更
+            st.markdown("<p class='no-print' style='font-size:0.9rem; font-weight:bold; margin-bottom:0.5rem;'>手動で在庫状況を絞り込む</p>", unsafe_allow_html=True)
+            selected_status = []
+            if unique_status:
+                with st.container(height=200):
+                    for stat in unique_status:
+                        if st.checkbox(stat, key=f"chk_stat_{stat}"):
+                            selected_status.append(stat)
+                            
             if selected_status:
                 filtered_items = [item for item in filtered_items if item["status"] in selected_status]
     
