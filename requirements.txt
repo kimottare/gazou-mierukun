@@ -2,4 +2,6 @@ streamlit
 pandas
 requests
 beautifulsoup4
+qrcode
+Pillow
 openpyxl
