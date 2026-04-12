@@ -26,7 +26,7 @@ st.set_page_config(page_title="商品画像見える君", layout="wide")
 # ==========================================
 st.markdown("""
     <style>
-    /* --- 画面表示用スタイル --- */
+    /* --- 画面表示用 --- */
     .main-title {
         font-size: 2.8rem !important;
         font-weight: 900 !important;
@@ -38,121 +38,56 @@ st.markdown("""
         border-left: 12px solid #ffffff;
         padding-left: 20px;
     }
-
     .product-title {
-        font-weight: 800;
-        font-size: 1.0rem;
-        line-height: 1.2;
-        height: 2.4em;
-        overflow: hidden;
-        margin-bottom: 4px;
-        color: #ffffff !important;
+        font-weight: 800; font-size: 1.0rem; line-height: 1.2; height: 2.4em;
+        overflow: hidden; margin-bottom: 4px; color: #ffffff !important;
         text-shadow: 2px 2px 5px rgba(0,0,0,1.0) !important;
     }
-
     .product-image-container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        background: #ffffff;
-        border-radius: 8px;
-        border: 1px solid #333;
-        overflow: hidden;
-        margin-bottom: 8px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.6);
+        display: flex; justify-content: center; align-items: center;
+        background: #ffffff; border-radius: 8px; border: 1px solid #333;
+        overflow: hidden; margin-bottom: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.6);
     }
-
-    .product-image-container img {
-        max-height: 100%;
-        max-width: 100%;
-        object-fit: contain;
-    }
-
+    .product-image-container img { max-height: 100%; max-width: 100%; object-fit: contain; }
     .product-details {
-        font-size: 0.75rem;
-        color: #e0e0e0 !important;
-        line-height: 1.3;
-        height: 3.9em;
-        overflow: hidden;
-        margin-bottom: 8px;
+        font-size: 0.75rem; color: #e0e0e0 !important; line-height: 1.3;
+        height: 3.9em; overflow: hidden; margin-bottom: 8px;
         text-shadow: 1px 1px 3px rgba(0,0,0,1.0);
     }
-
     footer {visibility: hidden;}
     [data-testid="stDecoration"] {display: none;}
     [data-testid="stHeader"] { background: transparent !important; }
 
-    /* 📱 スマホ2列強制 */
+    /* 📱 モバイル2列強制（iPhone Edge/Safari対応） */
     @media screen and (max-width: 800px) {
         div[data-testid="stHorizontalBlock"] {
-            display: flex !important;
-            flex-direction: row !important;
-            flex-wrap: wrap !important;
-            width: 100% !important;
-            gap: 0 !important;
+            display: flex !important; flex-direction: row !important;
+            flex-wrap: wrap !important; width: 100% !important; gap: 0 !important;
         }
         div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
-            width: 50% !important;
-            flex: 0 0 50% !important;
-            min-width: 50% !important;
-            max-width: 50% !important;
-            padding: 8px !important;
+            width: 50% !important; flex: 0 0 50% !important;
+            min-width: 50% !important; max-width: 50% !important; padding: 8px !important;
         }
         .product-image-container { height: 150px !important; }
         .main-title { font-size: 1.6rem !important; }
     }
 
-    /* ==========================================
-       🖨️ 印刷用設定（背景白・文字黒）
-       ========================================== */
+    /* 🖨️ 印刷用設定（背景白・文字黒・影なし） */
     @media print {
-        /* UI要素の非表示 */
         header, [data-testid="stSidebar"], [data-testid="stToolbar"], 
         .stButton, .stDownloadButton, [data-testid="stExpander"],
         [data-testid="stMultiSelect"], [data-testid="stCheckbox"], 
-        .no-print, iframe, .stTextInput, .stAlert, hr {
-            display: none !important;
-        }
-
-        /* 全体背景を白に強制 */
-        body, .main, [data-testid="stAppViewContainer"] {
-            background-color: white !important;
-            color: black !important;
-        }
-
-        /* タイトル・文字色を黒に切り替え、影を消す */
-        .main-title {
-            color: #000 !important;
-            text-shadow: none !important;
-            border-left: 8px solid #000 !important;
-            font-size: 1.8rem !important;
-        }
-        .product-title {
-            color: #000 !important;
-            text-shadow: none !important;
-        }
-        .product-details {
-            color: #333 !important;
-            text-shadow: none !important;
-        }
-
-        /* 画像コンテナの影を消し、枠線を薄くする */
-        .product-image-container {
-            border: 1px solid #ddd !important;
-            box-shadow: none !important;
-            background: #fff !important;
-        }
-
-        .main .block-container {
-            max-width: 100% !important;
-            padding: 0 !important;
-            margin: 0 !important;
-        }
+        .no-print, iframe, .stTextInput, .stAlert, hr { display: none !important; }
+        body, .main, [data-testid="stAppViewContainer"] { background-color: white !important; color: black !important; }
+        .main-title { color: #000 !important; text-shadow: none !important; border-left: 8px solid #000 !important; }
+        .product-title { color: #000 !important; text-shadow: none !important; }
+        .product-details { color: #333 !important; text-shadow: none !important; }
+        .product-image-container { border: 1px solid #ddd !important; box-shadow: none !important; background: #fff !important; }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 🔍 ロジック ---
+# --- 🔍 ロジック補助 ---
 def guess_column_index(columns, keywords, default_idx=0, exclude=[]):
     for keyword in keywords:
         for idx, col in enumerate(columns):
@@ -238,7 +173,7 @@ if not st.session_state.generated:
             bs_c = c3.selectbox("BS (カテゴリー)", cols, index=guess_column_index(cols, ['BS'], exclude=['size', 'サイズ']))
             size_c = c1.selectbox("Size", cols, index=guess_column_index(cols, ['size', 'サイズ']))
             qty_c = c2.selectbox("Qty", cols, index=guess_column_index(cols, ['qty', '数量']))
-            status_c = c3.selectbox("Status", cols, index=min(11, len(cols)-1)) # 列12デフォルト
+            status_c = c3.selectbox("Status", cols, index=min(11, len(cols)-1))
 
         if st.button("カタログ作成開始", type="primary", use_container_width=True):
             results = []
@@ -260,10 +195,15 @@ if not st.session_state.generated:
             save_auto_save_data(results)
             st.rerun()
 
+# --- 📊 表示エリア（機能復旧） ---
 if st.session_state.generated:
     display = [i for i in st.session_state.catalog_items if i.get("bs") in sel_bs]
     if is_new_only:
         display = [i for i in display if str(i.get("status", "")).upper() in ["#N/A", "#REF!", "NAN", "", "NEW"]]
+
+    # 🌟 合計件数と点数の計算・表示を復旧
+    total_q = sum([float(i.get("qty", 0)) if str(i.get("qty", "0")).replace('.','',1).isdigit() else 0 for i in display])
+    st.info(f"📊 **{len(display)}** 品番 / 合計 **{int(total_q)}** 点 を表示中")
 
     n_cols = 5 if is_print_mode else 2
     img_h = "140px" if is_print_mode else "240px"
@@ -276,3 +216,10 @@ if st.session_state.generated:
                 img = item["manual_url"] or item["auto_url"]
                 if img: st.markdown(f'<div class="product-image-container" style="height:{img_h};"><img src="{img}"></div>', unsafe_allow_html=True)
                 else: st.markdown(f'<div class="product-image-container" style="height:{img_h}; background:#f8f9fa;"><div style="color:#999; font-size:0.8rem;">画像なし</div></div>', unsafe_allow_html=True)
+                
+                if not is_print_mode:
+                    new_u = st.text_input("URL貼付", value=item["manual_url"], key=f"inp_{item['code']}")
+                    if new_u != item["manual_url"]:
+                        item["manual_url"] = new_u
+                        save_auto_save_data(st.session_state.catalog_items)
+                        st.rerun()
