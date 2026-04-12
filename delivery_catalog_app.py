@@ -16,13 +16,9 @@ st.set_page_config(page_title="商品画像見える君", layout="wide")
 # ヘッダー（GitHub/Editアイコン）、フッター、および印刷用CSS
 hide_style = """
 <style>
-/* 画面右上のツールバー（GitHubアイコン、Editボタン等）を非表示 */
 header {visibility: hidden;}
-
-/* 画面下部のStreamlitロゴを非表示 */
 footer {visibility: hidden;}
 
-/* 印刷用設定: Ctrl+P実行時に不要なUIを隠し、背景を白にする */
 @media print {
     header, footer, .stSidebar, .stButton, .stDownloadButton, 
     [data-testid="stExpander"], .stCheckbox, .stTabs, [data-testid="stForm"] {
@@ -119,12 +115,12 @@ def main():
         else:
             df_raw = pd.read_excel(uploaded_file, header=None)
 
-        # 【修正】ヘッダー自動検知ロジック
-        # 「品番」や「Article」という文字が含まれる最初の行を探す
+        # 【修正】ヘッダー自動検知ロジックのエラー対策（強制文字列化）
         header_row_idx = 0
         for i in range(min(len(df_raw), 20)):
-            row_values = df_raw.iloc[i].astype(str).tolist()
-            if any("品番" in val or "Article" in val or "品名" in val for val in row_values):
+            row_values = df_raw.iloc[i].tolist()
+            # エラー原因を解消: valを必ずstr(val)に変換してから判定する
+            if any("品番" in str(val) or "Article" in str(val) or "品名" in str(val) for val in row_values):
                 header_row_idx = i
                 break
         
@@ -135,8 +131,8 @@ def main():
         # カラム名から改行コードなどを除去し、Unnamedを防止
         df.columns = [str(c).strip() if pd.notna(c) else f"Unnamed_{i}" for i, c in enumerate(df.columns)]
 
-        # 列割り当て画面（2列レイアウトを維持）
-        with st.expander("🔍 列の割り当て設定 (全6項目)", expanded=True):
+        # 列割り当て画面
+        with st.expander("🔍 列の割り当て設定", expanded=True):
             cols = df.columns.tolist()
             c1, c2 = st.columns(2)
             
@@ -147,7 +143,7 @@ def main():
             
             with c2:
                 col_name = st.selectbox("4. 商品名(Product Name)列", ["なし"] + cols)
-                col_qty = st.selectbox("5. 入荷数量列", ["なし"] + cols) # カラーから変更
+                col_qty = st.selectbox("5. 入荷数量列", ["なし"] + cols)
                 col_stock = st.selectbox("6. 在庫状況/新規列", ["なし"] + cols)
 
         st.subheader("🛠️ リストの絞り込み")
@@ -221,7 +217,7 @@ def display_catalog(df, col_art, col_size, col_bs, col_name, col_qty, col_stock,
                 if col_name != "なし": st.caption(f"{row[col_name]}")
                 
                 details = []
-                if col_qty != "なし": details.append(f"Qty: {row[col_qty]}") # 数量を表示
+                if col_qty != "なし": details.append(f"Qty: {row[col_qty]}")
                 if col_size != "なし": details.append(f"Size: {row[col_size]}")
                 if col_bs != "なし": details.append(f"BS: {row[col_bs]}")
                 if col_stock != "なし": details.append(f"State: {row[col_stock]}")
