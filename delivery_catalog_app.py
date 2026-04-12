@@ -89,19 +89,14 @@ st.markdown("""
     [data-testid="stDecoration"] {display: none;}
     [data-testid="stHeader"] {display: none;}
 
-    /* ==========================================
-       📱 モバイル表示（スマホ）の劇的コンパクト化
-       ========================================== */
+    /* 📱 モバイル表示（スマホ）の劇的コンパクト化 */
     @media screen and (max-width: 600px) {
-        /* タイトルを小さく */
         .main-title {
             font-size: 1.6rem !important;
             border-left-width: 8px;
             padding-left: 12px;
             margin-top: 1rem !important;
         }
-        
-        /* 縦に並ばず、スマホでも横2列に並べる */
         [data-testid="stHorizontalBlock"] {
             display: flex !important;
             flex-direction: row !important;
@@ -112,18 +107,14 @@ st.markdown("""
             flex: 1 1 50% !important;
             min-width: 50% !important;
         }
-        
-        /* 文字を極限までコンパクトに */
         .product-title {
             font-size: 0.75rem !important;
-            height: 3.6em !important; /* スマホでは3行まで許容 */
+            height: 3.6em !important;
         }
         .product-details {
             font-size: 0.65rem !important;
             height: 4.5em !important;
         }
-        
-        /* 余白を詰める */
         div[data-testid="column"] {
             padding: 4px !important;
         }
@@ -256,13 +247,36 @@ if "generated" not in st.session_state:
 with st.sidebar:
     st.header("⚙️ 設定・管理")
     concurrency = st.slider("⚡ 検索スピード", 1, 10, 3)
-    is_print_mode = st.toggle("高密度・印刷モード (5列)", value=False)
+    # 👇 文言をコンパクトに修正
+    is_print_mode = st.toggle("コンパクトモード", value=False)
     
     if st.button("🖨️ カタログを印刷", use_container_width=True, type="primary"):
         components.html("<script>window.parent.print();</script>", height=0)
 
     st.write("---")
+    
+    # 👇 絞り込み機能をサイドバーに移動（バグ修正：モード切替でリセットされないようにするため）
     if st.session_state.generated:
+        st.subheader("🎯 絞り込み")
+        items = st.session_state.catalog_items
+        unique_bs = sorted(list(set([i["bs"] for i in items if i.get("bs")])))
+        
+        def set_all_bs(state):
+            for b in unique_bs: st.session_state[f"chk_{b}"] = state
+
+        c_btn1, c_btn2 = st.columns(2)
+        c_btn1.button("全選択", on_click=set_all_bs, args=(True,), use_container_width=True)
+        c_btn2.button("全解除", on_click=set_all_bs, args=(False,), use_container_width=True)
+        
+        sel_bs = []
+        if unique_bs:
+            with st.container(height=200):
+                for b in unique_bs:
+                    if st.checkbox(b, key=f"chk_{b}"): sel_bs.append(b)
+        
+        is_new_only = st.toggle("✨ 新規入荷のみ", key="new_only_toggle")
+        
+        st.write("---")
         if st.button("🗑️ リセット", type="secondary", use_container_width=True):
             confirm_reset()
 
@@ -342,33 +356,24 @@ if not st.session_state.generated:
         except Exception as e: st.error(f"エラー: {e}")
 
 if st.session_state.generated:
+    # --- 絞り込みロジックの適用 ---
     items = st.session_state.catalog_items
     filtered = items
     
+    # サイドバーの選択状態を反映
+    if 'bs_ms' in locals() or 'sel_bs' in locals(): # 前の変数が残っている場合のケア
+        pass 
+    
+    # 選択されたBSで絞り込み
+    if sel_bs:
+        filtered = [i for i in filtered if i["bs"] in sel_bs]
+    
+    # 新規入荷のみ絞り込み
+    if is_new_only:
+        filtered = [i for i in filtered if str(i.get("status", "")).strip().upper() in ["#N/A", "#REF!", "NAN", ""]]
+
+    # --- UI表示 ---
     if not is_print_mode:
-        st.markdown("<h3 class='no-print'>🎯 絞り込み</h3>", unsafe_allow_html=True)
-        c1, c2 = st.columns(2)
-        with c1:
-            unique_bs = sorted(list(set([i["bs"] for i in items if i.get("bs")])))
-            
-            # 👇 チェックボックス方式のロジックを維持
-            def set_all_bs(state):
-                for b in unique_bs: st.session_state[f"chk_{b}"] = state
-
-            bc1, bc2 = st.columns(2)
-            bc1.button("全て選択", on_click=set_all_bs, args=(True,), use_container_width=True)
-            bc2.button("全て解除", on_click=set_all_bs, args=(False,), use_container_width=True)
-            
-            sel_bs = []
-            if unique_bs:
-                with st.container(height=150):
-                    for b in unique_bs:
-                        if st.checkbox(b, key=f"chk_{b}"): sel_bs.append(b)
-            if sel_bs: filtered = [i for i in filtered if i["bs"] in sel_bs]
-        with c2:
-            if st.toggle("✨ 新規入荷のみ"):
-                filtered = [i for i in filtered if str(i.get("status", "")).strip().upper() in ["#N/A", "#REF!", "NAN", ""]]
-
         total_q = sum([float(i.get("qty",0)) if i.get("qty") else 0 for i in filtered])
         st.info(f"📊 **{len(filtered)}** 品番 / 合計 **{int(total_q)}** 点 を表示中")
         
@@ -383,7 +388,7 @@ if st.session_state.generated:
             components.html(qr_html, height=150)
     else:
         total_q = sum([float(i.get("qty",0)) if i.get("qty") else 0 for i in filtered])
-        st.caption(f"【5列高密度】 {len(filtered)} 品番 / {int(total_q)} 点")
+        st.caption(f"【コンパクトモード】 {len(filtered)} 品番 / {int(total_q)} 点")
 
     # --- カタログ本体 ---
     num_cols = 5 if is_print_mode else 3
@@ -404,6 +409,6 @@ if st.session_state.generated:
                     new_u = st.text_input("URL貼付", value=item.get("manual_url", ""), key=f"inp_{item['code']}")
                     if new_u != item.get("manual_url"):
                         item["manual_url"] = new_u
-                        save_auto_save_data(items)
+                        save_auto_save_data(st.session_state.catalog_items)
                         st.rerun()
                     st.write("---")
