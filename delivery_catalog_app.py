@@ -22,11 +22,11 @@ def get_shared_store():
 st.set_page_config(page_title="商品画像見える君", layout="wide")
 
 # ==========================================
-# 🎨 究極の視認性・高密度・整列CSS
+# 🎨 究極の視認性・高密度・モバイル最適化CSS
 # ==========================================
 st.markdown("""
     <style>
-    /* 1. タイトルの視認性（白文字 + 影で最強に） */
+    /* 1. タイトルの視認性（白文字 + 影） */
     .main-title {
         font-size: 2.8rem !important;
         font-weight: 900 !important;
@@ -39,7 +39,7 @@ st.markdown("""
         padding-left: 20px;
     }
 
-    /* 2. 商品名称の視認性向上 */
+    /* 2. 商品名称の視認性（白文字 + 影） */
     .product-title {
         font-weight: 800;
         font-size: 1.0rem;
@@ -64,7 +64,7 @@ st.markdown("""
         box-shadow: 0 4px 8px rgba(0,0,0,0.5);
     }
 
-    /* 画像をハッキリ表示（薄さを解消） */
+    /* 画像をハッキリ表示 */
     .product-image-container img {
         max-height: 100%;
         max-width: 100%;
@@ -83,11 +83,51 @@ st.markdown("""
         text-shadow: 1px 1px 3px rgba(0,0,0,1.0);
     }
 
-    /* Streamlit UI隠蔽 */
+    /* UI隠蔽 */
     header {visibility: hidden;}
     footer {visibility: hidden;}
     [data-testid="stDecoration"] {display: none;}
     [data-testid="stHeader"] {display: none;}
+
+    /* ==========================================
+       📱 モバイル表示（スマホ）の劇的コンパクト化
+       ========================================== */
+    @media screen and (max-width: 600px) {
+        /* タイトルを小さく */
+        .main-title {
+            font-size: 1.6rem !important;
+            border-left-width: 8px;
+            padding-left: 12px;
+            margin-top: 1rem !important;
+        }
+        
+        /* 縦に並ばず、スマホでも横2列に並べる */
+        [data-testid="stHorizontalBlock"] {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: wrap !important;
+        }
+        [data-testid="stHorizontalBlock"] > div {
+            width: 50% !important;
+            flex: 1 1 50% !important;
+            min-width: 50% !important;
+        }
+        
+        /* 文字を極限までコンパクトに */
+        .product-title {
+            font-size: 0.75rem !important;
+            height: 3.6em !important; /* スマホでは3行まで許容 */
+        }
+        .product-details {
+            font-size: 0.65rem !important;
+            height: 4.5em !important;
+        }
+        
+        /* 余白を詰める */
+        div[data-testid="column"] {
+            padding: 4px !important;
+        }
+    }
 
     /* 4. 印刷用設定 */
     @media print {
@@ -311,7 +351,7 @@ if st.session_state.generated:
         with c1:
             unique_bs = sorted(list(set([i["bs"] for i in items if i.get("bs")])))
             
-            # 👇 チェックボックス方式のロジック
+            # 👇 チェックボックス方式のロジックを維持
             def set_all_bs(state):
                 for b in unique_bs: st.session_state[f"chk_{b}"] = state
 
