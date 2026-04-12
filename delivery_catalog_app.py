@@ -64,7 +64,6 @@ st.markdown("""
         box-shadow: 0 4px 10px rgba(0,0,0,0.6);
     }
 
-    /* 画像をハッキリ表示（薄さを解消） */
     .product-image-container img {
         max-height: 100%;
         max-width: 100%;
@@ -83,7 +82,7 @@ st.markdown("""
         text-shadow: 1px 1px 3px rgba(0,0,0,1.0);
     }
 
-    /* メニューボタンを消さないように調整 */
+    /* サイドバー開閉ボタンを残すためのヘッダー調整 */
     footer {visibility: hidden;}
     [data-testid="stDecoration"] {display: none;}
     [data-testid="stHeader"] {
@@ -101,7 +100,7 @@ st.markdown("""
             margin-top: 1rem !important;
         }
 
-        /* 1カラム化（縦並び）を完全に阻止し、横2列を死守する */
+        /* 横並びを完全に強制 */
         div[data-testid="stHorizontalBlock"] {
             display: flex !important;
             flex-direction: row !important;
@@ -110,17 +109,17 @@ st.markdown("""
             gap: 0 !important;
         }
 
-        /* 各カラム要素を確実に50%幅で固定する */
+        /* カラムを確実に50%幅にする */
         div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
             width: 50% !important;
             flex: 0 0 50% !important;
             min-width: 50% !important;
             max-width: 50% !important;
-            padding: 8px !important;
+            padding: 5px !important;
         }
 
         .product-title {
-            font-size: 0.85rem !important;
+            font-size: 0.8rem !important;
             height: 2.4em !important;
             margin-bottom: 2px;
         }
@@ -131,11 +130,11 @@ st.markdown("""
         }
         
         .product-image-container {
-            height: 150px !important;
+            height: 150px !important; /* スマホ2列での適切なアスペクト比 */
         }
     }
 
-    /* 4. 印刷用設定 */
+    /* 印刷用設定 */
     @media print {
         header, [data-testid="stSidebar"], [data-testid="stToolbar"], 
         .stButton, .stDownloadButton, [data-testid="stExpander"],
@@ -157,7 +156,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# ダイアログ・関数
+# 削除確認ダイアログ
 # ==========================================
 @st.dialog("データの全消去")
 def confirm_reset():
@@ -261,7 +260,7 @@ if "generated" not in st.session_state:
 
 with st.sidebar:
     st.header("⚙️ 設定・管理")
-    # ⚡ デフォルト検索スピードを5に固定
+    # 初期検索スピードは5に固定
     concurrency = st.slider("⚡ 検索スピード", 1, 10, 5)
     is_print_mode = st.toggle("コンパクトモード", value=False)
     
@@ -270,15 +269,15 @@ with st.sidebar:
 
     st.write("---")
     
-    # 🎯 絞り込みセクション
+    # 👇 絞り込みセクション
     if st.session_state.generated:
         st.subheader("🎯 絞り込み")
         
-        # ✨ 新規入荷のみチェック
+        # ✨ 新規入荷のみ
         is_new_only = st.checkbox("✨ 新規入荷のみ", key="new_only_toggle")
 
         items = st.session_state.catalog_items
-        # 👇 【修正】カテゴリー(BS)を正しく抽出
+        # 🌟 修正：カテゴリー(BS)の値を「サイズ」と混同しないよう厳密に抽出
         unique_bs = sorted(list(set([str(i["bs"]) for i in items if i.get("bs") and str(i.get("bs")).strip() != ""])))
         
         def set_all_bs(state):
@@ -290,10 +289,10 @@ with st.sidebar:
         
         sel_bs = []
         if unique_bs:
-            with st.container(height=200):
-                # 👇 【修正】ここがサイズではなくカテゴリー(BS)であることを保証
+            with st.container(height=250):
+                # ここがサイズではなく「カテゴリー名」であることを再度保証
                 for b in unique_bs:
-                    if st.checkbox(f"BS: {b}", key=f"chk_{b}"): sel_bs.append(b)
+                    if st.checkbox(b, key=f"chk_{b}"): sel_bs.append(b)
         
         st.write("---")
         if st.button("🗑️ リセット", type="secondary", use_container_width=True):
@@ -329,7 +328,7 @@ if not st.session_state.generated:
                     name_col = st.selectbox("Name", columns, index=guess_column_index(columns, ['商品名称', '名称', 'name', 'item']))
                     qty_col = st.selectbox("Qty", columns, index=guess_column_index(columns, ['qty', '数量']))
                 with c3:
-                    # 👇 【修正】カテゴリー(BS)の自動検出キーワードを強化
+                    # キーワードを強化：サイズと混同されないように bs/category を優先
                     bs_col = st.selectbox("BS (カテゴリー)", columns, index=guess_column_index(columns, ['bs', 'category', '部門', 'カテゴリ', 'division']))
                     status_col = st.selectbox("Status", ["(なし)"] + columns, index=len(columns))
 
@@ -356,7 +355,7 @@ if not st.session_state.generated:
                     code, name = str(row[code_col]).strip(), str(row[name_col]).strip()
                     if not code or code.lower() in ['nan', 'none']: return idx, None
                     img = get_best_image(code, name)
-                    # 👇 【修正】ここでBSに確実にカテゴリー列のデータを入れる
+                    # 確実にBS（カテゴリー）列のデータを代入
                     return idx, {"code": code, "name": name, "bs": str(row[bs_col]).strip() if bs_col != "(なし)" else "",
                                "size": agg_sizes.get(code, ""), "qty": agg_qtys.get(code, ""),
                                "status": str(row[status_col]) if status_col != "(なし)" else "",
@@ -377,7 +376,6 @@ if not st.session_state.generated:
         except Exception as e: st.error(f"エラー: {e}")
 
 if st.session_state.generated:
-    # 絞り込みロジックの適用
     items = st.session_state.catalog_items
     filtered = items
     
@@ -387,7 +385,6 @@ if st.session_state.generated:
     if is_new_only:
         filtered = [i for i in filtered if str(i.get("status", "")).strip().upper() in ["#N/A", "#REF!", "NAN", ""]]
 
-    # UI表示
     total_q = sum([float(i.get("qty",0)) if i.get("qty") else 0 for i in filtered])
     
     if not is_print_mode:
@@ -395,7 +392,7 @@ if st.session_state.generated:
     else:
         st.caption(f"【コンパクトモード】 {len(filtered)} 品番 / {int(total_q)} 点")
 
-    # 📱 スマホ転送・出力セクション
+    # QRコードと保存セクション
     st.markdown("<h3 class='no-print'>📱 スマホ転送・出力</h3>", unsafe_allow_html=True)
     btn1, btn2 = st.columns(2)
     with btn1:
