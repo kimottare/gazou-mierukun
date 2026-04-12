@@ -7,7 +7,6 @@ import json
 import os 
 import concurrent.futures
 import datetime
-import socket 
 import uuid
 import streamlit.components.v1 as components
 
@@ -26,17 +25,12 @@ st.set_page_config(page_title="商品画像見える君", layout="wide")
 # ==========================================
 st.markdown("""
     <style>
-    /* --- 画面表示用 --- */
+    /* 画面表示：白文字＋強力シャドウ */
     .main-title {
-        font-size: 2.8rem !important;
-        font-weight: 900 !important;
-        color: #ffffff !important;
+        font-size: 2.8rem !important; font-weight: 900 !important; color: #ffffff !important;
         text-shadow: 3px 3px 12px rgba(0,0,0,1.0), 0 0 25px rgba(0,0,0,0.8) !important;
-        margin-top: 1.5rem !important;
-        margin-bottom: 1.5rem !important;
-        text-align: left;
-        border-left: 12px solid #ffffff;
-        padding-left: 20px;
+        margin-top: 1.5rem !important; margin-bottom: 1.5rem !important;
+        text-align: left; border-left: 12px solid #ffffff; padding-left: 20px;
     }
     .product-title {
         font-weight: 800; font-size: 1.0rem; line-height: 1.2; height: 2.4em;
@@ -58,7 +52,7 @@ st.markdown("""
     [data-testid="stDecoration"] {display: none;}
     [data-testid="stHeader"] { background: transparent !important; }
 
-    /* 📱 モバイル2列強制（iPhone Edge/Safari対応） */
+    /* 📱 スマホ2列強制 */
     @media screen and (max-width: 800px) {
         div[data-testid="stHorizontalBlock"] {
             display: flex !important; flex-direction: row !important;
@@ -72,11 +66,10 @@ st.markdown("""
         .main-title { font-size: 1.6rem !important; }
     }
 
-    /* 🖨️ 印刷用設定（背景白・文字黒・影なし） */
+    /* 🖨️ 印刷用：背景白・文字黒 */
     @media print {
         header, [data-testid="stSidebar"], [data-testid="stToolbar"], 
         .stButton, .stDownloadButton, [data-testid="stExpander"],
-        [data-testid="stMultiSelect"], [data-testid="stCheckbox"], 
         .no-print, iframe, .stTextInput, .stAlert, hr { display: none !important; }
         body, .main, [data-testid="stAppViewContainer"] { background-color: white !important; color: black !important; }
         .main-title { color: #000 !important; text-shadow: none !important; border-left: 8px solid #000 !important; }
@@ -87,7 +80,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 🔍 ロジック補助 ---
+# --- 🔍 ロジック ---
 def guess_column_index(columns, keywords, default_idx=0, exclude=[]):
     for keyword in keywords:
         for idx, col in enumerate(columns):
@@ -129,33 +122,43 @@ if "catalog_items" not in st.session_state:
         except: pass
 
 with st.sidebar:
-    st.header("⚙️ 設定・管理")
+    st.header("⚙️ 管理")
     concurrency = st.slider("⚡ 検索スピード", 1, 10, 5)
     is_print_mode = st.toggle("コンパクトモード", value=False)
     
-    if st.button("🖨️ カタログを印刷", use_container_width=True, type="primary"):
+    if st.button("🖨️ 印刷する", use_container_width=True, type="primary"):
         components.html("<script>window.parent.print();</script>", height=0)
 
     if st.session_state.generated:
         st.write("---")
         st.subheader("🎯 絞り込み")
         is_new_only = st.checkbox("✨ 新規入荷のみ", key="new_only_toggle")
+        
         items = st.session_state.catalog_items
         unique_bs = sorted(list(set([str(i["bs"]).strip() for i in items if i.get("bs") and not any(c.isdigit() for c in str(i["bs"])) and len(str(i["bs"])) > 2])))
         
+        # 🌟 復旧：全選択・全解除ボタン
+        def set_all_bs(state):
+            for b in unique_bs: st.session_state[f"chk_{b}"] = state
+
+        c_btn1, c_btn2 = st.columns(2)
+        c_btn1.button("全選択", on_click=set_all_bs, args=(True,), use_container_width=True)
+        c_btn2.button("全解除", on_click=set_all_bs, args=(False,), use_container_width=True)
+        
         sel_bs = []
         if unique_bs:
-            with st.container(height=200):
+            with st.container(height=250):
                 for b in unique_bs:
                     if st.checkbox(b, key=f"chk_{b}", value=st.session_state.get(f"chk_{b}", True)):
                         sel_bs.append(b)
         
-        if st.button("🗑️ リセット", type="secondary", use_container_width=True):
+        if st.button("🗑️ データをクリア"):
             if os.path.exists(AUTO_SAVE_FILE): os.remove(AUTO_SAVE_FILE)
             st.session_state.catalog_items = []
             st.session_state.generated = False
             st.rerun()
 
+# --- アップロード ---
 if not st.session_state.generated:
     uploaded_file = st.file_uploader("Excel/CSVをアップロード", type=['xlsx', 'csv'])
     if uploaded_file:
@@ -173,7 +176,7 @@ if not st.session_state.generated:
             bs_c = c3.selectbox("BS (カテゴリー)", cols, index=guess_column_index(cols, ['BS'], exclude=['size', 'サイズ']))
             size_c = c1.selectbox("Size", cols, index=guess_column_index(cols, ['size', 'サイズ']))
             qty_c = c2.selectbox("Qty", cols, index=guess_column_index(cols, ['qty', '数量']))
-            status_c = c3.selectbox("Status", cols, index=min(11, len(cols)-1))
+            status_c = c3.selectbox("Status", cols, index=min(11, len(cols)-1)) # 列12
 
         if st.button("カタログ作成開始", type="primary", use_container_width=True):
             results = []
@@ -195,16 +198,24 @@ if not st.session_state.generated:
             save_auto_save_data(results)
             st.rerun()
 
-# --- 📊 表示エリア（機能復旧） ---
+# --- 📊 メイン表示 ---
 if st.session_state.generated:
     display = [i for i in st.session_state.catalog_items if i.get("bs") in sel_bs]
     if is_new_only:
         display = [i for i in display if str(i.get("status", "")).upper() in ["#N/A", "#REF!", "NAN", "", "NEW"]]
 
-    # 🌟 合計件数と点数の計算・表示を復旧
-    total_q = sum([float(i.get("qty", 0)) if str(i.get("qty", "0")).replace('.','',1).isdigit() else 0 for i in display])
+    # 🌟 復旧：総品番数と合計点数の表示
+    total_q = sum([float(str(i.get("qty", "0")).replace(',','')) if str(i.get("qty", "0")).replace('.','',1).isdigit() else 0 for i in display])
     st.info(f"📊 **{len(display)}** 品番 / 合計 **{int(total_q)}** 点 を表示中")
 
+    # 🌟 復旧：スマホ転送用QRコード（コンパクトモードでも常時表示）
+    st.markdown("<h3 class='no-print'>📱 スマホ転送</h3>", unsafe_allow_html=True)
+    sid = st.session_state.get("share_id", uuid.uuid4().hex[:8]); st.session_state.share_id = sid
+    get_shared_store()[sid] = display
+    qr_html = f'<div style="text-align:center;"><div id="qrcode" style="display:inline-block;background:white;padding:10px;border-radius:8px;"></div></div><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script><script>new QRCode(document.getElementById("qrcode"), {{text:window.parent.location.href.split("?")[0]+"?sid={sid}", width:120, height:120}});</script>'
+    components.html(qr_html, height=150)
+
+    # カタログ本体
     n_cols = 5 if is_print_mode else 2
     img_h = "140px" if is_print_mode else "240px"
     for i in range(0, len(display), n_cols):
