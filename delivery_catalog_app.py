@@ -275,25 +275,23 @@ if not st.session_state.generated:
                 columns.append(new_col)
             df.columns = columns
             
-            # 👇 ここから変更：3つのカラムに分けてプルダウンを配置し、コンパクトにする
-            st.markdown("<p style='font-weight:bold; margin-bottom:0.5rem;'>📋 読み込む列の割り当て</p>", unsafe_allow_html=True)
-            sel_col1, sel_col2, sel_col3 = st.columns(3)
-            
-            with sel_col1:
-                code_col = st.selectbox("Articleの列", columns, index=guess_column_index(columns, ['artno', 'article', 'art', 'code']))
-                size_col_idx = guess_column_index(columns, ['size', 'サイズ', 'sizetext'])
-                size_col = st.selectbox("サイズ(Size)の列", ["(なし)"] + columns, index=size_col_idx+1)
+            with st.expander("📋 読み込む列の割り当て (クリックして確認・変更)"):
+                sel_col1, sel_col2, sel_col3 = st.columns(3)
                 
-            with sel_col2:
-                name_col = st.selectbox("Nameの列", columns, index=guess_column_index(columns, ['商品名称', 'name', 'item']))
-                qty_col_idx = guess_column_index(columns, ['qty', 'quantity', '数量', '出荷数量'])
-                qty_col = st.selectbox("数量(Qty)の列", ["(なし)"] + columns, index=qty_col_idx+1)
-                
-            with sel_col3:
-                bs_col_idx = guess_column_index(columns, ['bs', 'category'])
-                bs_col = st.selectbox("BSの列", ["(なし)"] + columns, index=bs_col_idx+1)
-                status_col = st.selectbox("Status(在庫状況)の列", ["(なし)"] + columns, index=len(columns))
-            # 👆 ここまで変更
+                with sel_col1:
+                    code_col = st.selectbox("Articleの列", columns, index=guess_column_index(columns, ['artno', 'article', 'art', 'code']))
+                    size_col_idx = guess_column_index(columns, ['size', 'サイズ', 'sizetext'])
+                    size_col = st.selectbox("サイズ(Size)の列", ["(なし)"] + columns, index=size_col_idx+1)
+                    
+                with sel_col2:
+                    name_col = st.selectbox("Nameの列", columns, index=guess_column_index(columns, ['商品名称', 'name', 'item']))
+                    qty_col_idx = guess_column_index(columns, ['qty', 'quantity', '数量', '出荷数量'])
+                    qty_col = st.selectbox("数量(Qty)の列", ["(なし)"] + columns, index=qty_col_idx+1)
+                    
+                with sel_col3:
+                    bs_col_idx = guess_column_index(columns, ['bs', 'category'])
+                    bs_col = st.selectbox("BSの列", ["(なし)"] + columns, index=bs_col_idx+1)
+                    status_col = st.selectbox("Status(在庫状況)の列", ["(なし)"] + columns, index=len(columns))
             
             if st.button("作成", type="primary", use_container_width=True):
                 display_df = df[df[code_col].astype(str).str.strip() != ""]
