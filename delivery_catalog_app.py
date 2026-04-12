@@ -21,11 +21,11 @@ def get_shared_store():
 st.set_page_config(page_title="商品画像見える君", layout="wide")
 
 # ==========================================
-# 🎨 究極の視認性・モバイル2列・印刷最適化CSS
+# 🎨 究極の視認性・モバイル2列・印刷・UI完全制御CSS
 # ==========================================
 st.markdown("""
     <style>
-    /* 画面表示：白文字＋強力シャドウ */
+    /* 1. 全般・視認性 */
     .main-title {
         font-size: 2.8rem !important; font-weight: 900 !important; color: #ffffff !important;
         text-shadow: 3px 3px 12px rgba(0,0,0,1.0), 0 0 25px rgba(0,0,0,0.8) !important;
@@ -48,11 +48,15 @@ st.markdown("""
         height: 3.9em; overflow: hidden; margin-bottom: 8px;
         text-shadow: 1px 1px 3px rgba(0,0,0,1.0);
     }
-    footer {visibility: hidden;}
-    [data-testid="stDecoration"] {display: none;}
-    [data-testid="stHeader"] { background: transparent !important; }
 
-    /* 📱 スマホ2列強制 */
+    /* 2. 右上の不要なボタン（Share, Star, GitHub等）とヘッダーを完全に消す */
+    header, [data-testid="stHeader"], [data-testid="stToolbar"], [data-testid="stDecoration"] {
+        display: none !important;
+        visibility: hidden !important;
+    }
+    footer {visibility: hidden !important;}
+
+    /* 📱 モバイル2列強制（iPhone Edge/Safari） */
     @media screen and (max-width: 800px) {
         div[data-testid="stHorizontalBlock"] {
             display: flex !important; flex-direction: row !important;
@@ -68,9 +72,7 @@ st.markdown("""
 
     /* 🖨️ 印刷用：背景白・文字黒 */
     @media print {
-        header, [data-testid="stSidebar"], [data-testid="stToolbar"], 
-        .stButton, .stDownloadButton, [data-testid="stExpander"],
-        .no-print, iframe, .stTextInput, .stAlert, hr { display: none !important; }
+        header, [data-testid="stSidebar"], .no-print, iframe, .stTextInput, .stAlert { display: none !important; }
         body, .main, [data-testid="stAppViewContainer"] { background-color: white !important; color: black !important; }
         .main-title { color: #000 !important; text-shadow: none !important; border-left: 8px solid #000 !important; }
         .product-title { color: #000 !important; text-shadow: none !important; }
@@ -80,7 +82,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 🔍 ロジック ---
+# --- 🔍 ヘルパー ---
 def guess_column_index(columns, keywords, default_idx=0, exclude=[]):
     for keyword in keywords:
         for idx, col in enumerate(columns):
@@ -134,6 +136,7 @@ with st.sidebar:
         st.subheader("🎯 絞り込み")
         is_new_only = st.checkbox("✨ 新規入荷のみ", key="new_only_toggle")
         
+        # BS（カテゴリー）抽出
         items = st.session_state.catalog_items
         unique_bs = sorted(list(set([str(i["bs"]).strip() for i in items if i.get("bs") and not any(c.isdigit() for c in str(i["bs"])) and len(str(i["bs"])) > 2])))
         
@@ -152,13 +155,13 @@ with st.sidebar:
                     if st.checkbox(b, key=f"chk_{b}", value=st.session_state.get(f"chk_{b}", True)):
                         sel_bs.append(b)
         
-        if st.button("🗑️ データをクリア"):
+        if st.button("🗑️ データをリセット"):
             if os.path.exists(AUTO_SAVE_FILE): os.remove(AUTO_SAVE_FILE)
             st.session_state.catalog_items = []
             st.session_state.generated = False
             st.rerun()
 
-# --- アップロード ---
+# --- リスト作成 ---
 if not st.session_state.generated:
     uploaded_file = st.file_uploader("Excel/CSVをアップロード", type=['xlsx', 'csv'])
     if uploaded_file:
@@ -176,7 +179,7 @@ if not st.session_state.generated:
             bs_c = c3.selectbox("BS (カテゴリー)", cols, index=guess_column_index(cols, ['BS'], exclude=['size', 'サイズ']))
             size_c = c1.selectbox("Size", cols, index=guess_column_index(cols, ['size', 'サイズ']))
             qty_c = c2.selectbox("Qty", cols, index=guess_column_index(cols, ['qty', '数量']))
-            status_c = c3.selectbox("Status", cols, index=min(11, len(cols)-1)) # 列12
+            status_c = c3.selectbox("Status", cols, index=min(11, len(cols)-1)) # 列12デフォルト
 
         if st.button("カタログ作成開始", type="primary", use_container_width=True):
             results = []
@@ -208,7 +211,7 @@ if st.session_state.generated:
     total_q = sum([float(str(i.get("qty", "0")).replace(',','')) if str(i.get("qty", "0")).replace('.','',1).isdigit() else 0 for i in display])
     st.info(f"📊 **{len(display)}** 品番 / 合計 **{int(total_q)}** 点 を表示中")
 
-    # 🌟 復旧：スマホ転送用QRコード（コンパクトモードでも常時表示）
+    # 🌟 復旧：スマホ転送用QRコード
     st.markdown("<h3 class='no-print'>📱 スマホ転送</h3>", unsafe_allow_html=True)
     sid = st.session_state.get("share_id", uuid.uuid4().hex[:8]); st.session_state.share_id = sid
     get_shared_store()[sid] = display
