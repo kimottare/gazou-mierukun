@@ -22,7 +22,7 @@ def get_shared_store():
 st.set_page_config(page_title="商品画像見える君", layout="wide")
 
 # ==========================================
-# 🎨 究極の視認性 & 高密度CSS
+# 🎨 究極の視認性 & 高密度CSS（画像バグ修正）
 # ==========================================
 st.markdown("""
     <style>
@@ -38,7 +38,7 @@ st.markdown("""
         padding-left: 15px;
     }
 
-    /* 2. 商品カードの等高・整列（ズレ防止） */
+    /* 2. 商品カードの整列 & 画像バグ修正 */
     div[data-testid="column"] {
         display: flex;
         flex-direction: column;
@@ -46,18 +46,35 @@ st.markdown("""
         padding: 8px !important;
     }
     
-    .product-card-container {
-        min-height: 380px; /* カード全体の高さを統一 */
+    /* 画像コンテナの設定 */
+    .product-image-container {
         display: flex;
-        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        background: #fff;
+        border-radius: 6px;
+        border: 1px solid #eee;
+        overflow: hidden;
+        margin-bottom: 8px;
     }
 
-    /* 品名・詳細の装飾 */
+    /* 👇 【最重要修正】画像をハッキリ表示させる（薄くなるバグを解消） */
+    .product-image-container img {
+        max-height: 100%;
+        max-width: 100%;
+        object-fit: contain;
+        /* 透明度を100%にし、フィルターを無効化してハッキリさせる */
+        opacity: 1 !important;
+        filter: brightness(1) contrast(1) !important;
+        -webkit-filter: grayscale(0%) !important;
+    }
+
+    /* 品名・詳細の装飾（ズレ防止） */
     .product-title {
         font-weight: 800;
         font-size: 0.95rem;
         line-height: 1.2;
-        height: 2.4em; /* 2行分確保してズレを防ぐ */
+        height: 2.4em; /* 2行分確保 */
         overflow: hidden;
         margin-bottom: 4px;
         color: #111;
@@ -90,9 +107,20 @@ st.markdown("""
             padding: 0 !important;
             margin: 0 !important;
         }
-        body { background-color: white !important; }
+        body {
+            background-color: white !important;
+            /* 👇 【修正】印刷時も色をハッキリ出す（インク節約機能を無効化） */
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
         .product-title { font-size: 0.8rem; }
         .product-details { font-size: 0.65rem; }
+        
+        /* 印刷時も画像をハッキリ */
+        .product-image-container img {
+            opacity: 1 !important;
+            filter: none !important;
+        }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -322,7 +350,7 @@ if st.session_state.generated:
         total_q = sum([float(i.get("qty",0)) if i.get("qty") else 0 for i in filtered])
         st.caption(f"【高密度モード】 {len(filtered)} 品番 / {int(total_q)} 点")
 
-    # --- カタログ本体（5列対応） ---
+    # --- カタログ本体 ---
     num_cols = 5 if is_print_mode else 3
     img_h = "140px" if is_print_mode else "260px"
     
@@ -335,10 +363,11 @@ if st.session_state.generated:
                 detail_str = f"Art: {item['code']}<br>Size: {item['size']}<br>Qty: {item.get('qty','0')}点 / {item['status']}"
                 st.markdown(f'<div class="product-details">{detail_str}</div>', unsafe_allow_html=True)
                 
-                # 画像
+                # 画像（HTMLとCSSでズレと薄さを修正）
                 url = item.get("manual_url") or item.get("auto_url")
-                if url: st.markdown(f'<div style="height:{img_h};display:flex;justify-content:center;background:#fff;border-radius:6px;border:1px solid #eee;overflow:hidden;margin-bottom:8px;"><img src="{url}" style="max-height:100%;max-width:100%;object-fit:contain;"></div>', unsafe_allow_html=True)
-                else: st.markdown(f'<div style="height:{img_h};display:flex;justify-content:center;align-items:center;background:#f8f9fa;border-radius:6px;border:1px solid #ddd;color:#999;margin-bottom:8px;">画像なし</div>', unsafe_allow_html=True)
+                # 👇 【修正】product-image-container クラスを使用
+                if url: st.markdown(f'<div class="product-image-container" style="height:{img_h};"><img src="{url}"></div>', unsafe_allow_html=True)
+                else: st.markdown(f'<div class="product-image-container" style="height:{img_h}; background:#f8f9fa; border-color:#ddd;"><div style="color:#999; font-size:0.9rem;">画像なし</div></div>', unsafe_allow_html=True)
                 
                 # 作業UI（高密度モード時は隠す）
                 if not is_print_mode:
