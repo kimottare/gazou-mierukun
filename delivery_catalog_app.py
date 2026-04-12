@@ -313,15 +313,19 @@ if st.session_state.generated:
         with c1:
             unique_bs = sorted(list(set([i["bs"] for i in items if i.get("bs")])))
             
-            # 👇 プルダウン（マルチセレクト）形式に修正
-            def select_all(): st.session_state.bs_ms = unique_bs
-            def deselect_all(): st.session_state.bs_ms = []
+            # 👇 【復元】チェックボックス方式のロジック
+            def set_all_bs(state):
+                for b in unique_bs: st.session_state[f"chk_{b}"] = state
 
             bc1, bc2 = st.columns(2)
-            bc1.button("全て選択", on_click=select_all, use_container_width=True)
-            bc2.button("全て解除", on_click=deselect_all, use_container_width=True)
+            bc1.button("全て選択", on_click=set_all_bs, args=(True,), use_container_width=True)
+            bc2.button("全て解除", on_click=set_all_bs, args=(False,), use_container_width=True)
             
-            sel_bs = st.multiselect("カテゴリーを選択 (BS)", unique_bs, key="bs_ms")
+            sel_bs = []
+            if unique_bs:
+                with st.container(height=150):
+                    for b in unique_bs:
+                        if st.checkbox(b, key=f"chk_{b}"): sel_bs.append(b)
             if sel_bs: filtered = [i for i in filtered if i["bs"] in sel_bs]
         with c2:
             if st.toggle("✨ 新規入荷のみ"):
