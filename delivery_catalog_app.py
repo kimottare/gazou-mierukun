@@ -126,27 +126,35 @@ def main():
         else:
             df = pd.read_excel(uploaded_file)
 
-        # 列割り当て画面（st.expanderでコンパクトに）
-        with st.expander("🔍 列の割り当て設定", expanded=True):
+        # 列割り当て画面（6列レイアウト復元）
+        with st.expander("🔍 列の割り当て設定 (全6項目)", expanded=True):
             cols = df.columns.tolist()
-            col_art = st.selectbox("品番(Article)列", cols, index=0 if "品番" in cols or "Article" in cols else 0)
-            col_bs = st.selectbox("カテゴリー(BS)列", ["なし"] + cols)
-            col_stock = st.selectbox("在庫状況/新規列", ["なし"] + cols)
+            c1, c2 = st.columns(2)
+            
+            with c1:
+                col_art = st.selectbox("1. 品番(Article)列 ※必須", cols, index=0 if "品番" in cols or "Article" in cols else 0)
+                col_size = st.selectbox("2. サイズ(Size)列", ["なし"] + cols)
+                col_bs = st.selectbox("3. カテゴリー(BS)列", ["なし"] + cols)
+            
+            with c2:
+                col_name = st.selectbox("4. 商品名(Product Name)列", ["なし"] + cols)
+                col_color = st.selectbox("5. カラー(Color)列", ["なし"] + cols)
+                col_stock = st.selectbox("6. 在庫状況/新規列", ["なし"] + cols)
 
-        # 絞り込みフィルター
+        # 絞り込みフィルター（BSと在庫状況を使用）
         st.subheader("🛠️ リストの絞り込み")
         filtered_df = df.copy()
         
-        col1, col2 = st.columns(2)
-        with col1:
+        fc1, fc2 = st.columns(2)
+        with fc1:
             if col_bs != "なし":
-                bs_list = df[col_bs].unique().tolist()
+                bs_list = df[col_bs].dropna().unique().tolist()
                 selected_bs = st.multiselect("カテゴリー(BS)で絞り込み", bs_list, default=bs_list)
                 filtered_df = filtered_df[filtered_df[col_bs].isin(selected_bs)]
         
-        with col2:
+        with fc2:
             if col_stock != "なし":
-                stock_list = df[col_stock].unique().tolist()
+                stock_list = df[col_stock].dropna().unique().tolist()
                 selected_stock = st.multiselect("在庫状況で絞り込み", stock_list, default=stock_list)
                 filtered_df = filtered_df[filtered_df[col_stock].isin(selected_stock)]
 
@@ -166,18 +174,30 @@ def main():
 
         # カタログ表示
         if "catalog_data" in st.session_state:
-            display_catalog(st.session_state["catalog_data"], col_art, col_bs, is_print_mode)
+            display_catalog(
+                st.session_state["catalog_data"], 
+                col_art, col_size, col_bs, col_name, col_color, col_stock, 
+                is_print_mode
+            )
             
             # スマホ転送用QRコード発行
             st.divider()
             st.subheader("📱 スマホ（iPhone）へ送る")
             if st.button("スマホ転送用QRコードを発行"):
                 sid = str(uuid.uuid4())
-                shared_store[sid] = st.session_state["catalog_data"]
                 
-                # 現在のURLを取得してパラメータを付与
+                # データフレームだけでなく、選択した列情報も一緒にスマホへ送る
+                shared_store[sid] = {
+                    "df": st.session_state["catalog_data"],
+                    "col_art": col_art,
+                    "col_size": col_size,
+                    "col_bs": col_bs,
+                    "col_name": col_name,
+                    "col_color": col_color,
+                    "col_stock": col_stock
+                }
+                
                 share_url = f"https://{st.query_params.get('host', 'localhost')}/?sid={sid}"
-                # 簡易的なQRコード生成（Streamlit Cloud環境を想定）
                 img_qr = qrcode.make(share_url)
                 buf = BytesIO()
                 img_qr.save(buf, format="PNG")
@@ -188,8 +208,8 @@ def main():
 # ==========================================
 # 5. UI表示用サブ関数
 # ==========================================
-def display_catalog(df, col_art, col_bs, is_print_mode):
-    """カタログをグリッド形式で表示"""
+def display_catalog(df, col_art, col_size, col_bs, col_name, col_color, col_stock, is_print_mode):
+    """カタログをPC画面にグリッド形式で表示"""
     cols_per_row = 4 if not is_print_mode else 6
     rows = [df[i:i + cols_per_row] for i in range(0, len(df), cols_per_row)]
     
@@ -197,29 +217,65 @@ def display_catalog(df, col_art, col_bs, is_print_mode):
         cols = st.columns(cols_per_row)
         for i, (idx, row) in enumerate(row_df.iterrows()):
             with cols[i]:
+                # 画像の表示
                 if row["image_url"]:
                     st.image(row["image_url"], use_container_width=True)
                 else:
                     st.warning("No Image")
                 
-                # 品番とカテゴリーを表示
-                st.caption(f"**{row[col_art]}**")
-                if col_bs != "なし":
-                    st.write(f"Size/BS: {row[col_bs]}")
+                # 各種テキスト情報の表示
+                st.markdown(f"**{row[col_art]}**")
+                
+                if col_name != "なし":
+                    st.caption(f"{row[col_name]}")
+                
+                # 詳細情報を箇条書きのようにまとめる
+                details = []
+                if col_size != "なし": details.append(f"Size: {row[col_size]}")
+                if col_color != "なし": details.append(f"Color: {row[col_color]}")
+                if col_bs != "なし": details.append(f"BS: {row[col_bs]}")
+                if col_stock != "なし": details.append(f"State: {row[col_stock]}")
+                
+                if details:
+                    st.write(" / ".join(details))
 
 def show_mobile_view(sid):
-    """スマホ閲覧専用画面"""
-    st.title("📱 共有されたカタログ")
+    """スマホ閲覧専用画面（iPhone表示用）"""
+    st.title("📱 納品カタログ")
     if sid in shared_store:
-        df = shared_store[sid]
-        st.write(f"共有件数: {len(df)} 件")
-        # モバイルではシンプルに表示（品番列などは仮に0,1番目を想定するか、共有データに持たせる）
-        # ※ここでは簡易的に全件表示
+        data = shared_store[sid]
+        
+        # 過去のデータ構造（DataFrameのみ）との互換性チェック
+        if isinstance(data, pd.DataFrame):
+            df = data
+            col_art = df.columns[0]
+            col_size = col_bs = col_name = col_color = col_stock = "なし"
+        else:
+            df = data["df"]
+            col_art = data["col_art"]
+            col_size = data["col_size"]
+            col_bs = data["col_bs"]
+            col_name = data["col_name"]
+            col_color = data["col_color"]
+            col_stock = data["col_stock"]
+
+        st.write(f"表示件数: {len(df)} 件")
+        
+        # モバイルでは縦スクロールで1件ずつ大きく表示
         for _, row in df.iterrows():
             st.divider()
             if row["image_url"]:
                 st.image(row["image_url"], use_container_width=True)
-            st.subheader(f"Article: {row.iloc[0]}") # 最初の列を品番と見なす
+            
+            st.subheader(f"品番: {row[col_art]}")
+            
+            # 選択された列だけをスマホにも表示する
+            if col_name != "なし": st.write(f"**品名:** {row[col_name]}")
+            if col_size != "なし": st.write(f"**サイズ:** {row[col_size]}")
+            if col_color != "なし": st.write(f"**カラー:** {row[col_color]}")
+            if col_bs != "なし": st.write(f"**カテゴリー:** {row[col_bs]}")
+            if col_stock != "なし": st.write(f"**在庫状況:** {row[col_stock]}")
+            
     else:
         st.error("セッションが切れたか、データが見つかりません。PC側でQRコードを再発行してください。")
         if st.button("トップへ戻る"):
