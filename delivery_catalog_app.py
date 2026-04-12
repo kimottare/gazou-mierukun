@@ -22,7 +22,7 @@ def get_shared_store():
 st.set_page_config(page_title="商品画像見える君", layout="wide")
 
 # ==========================================
-# 🎨 究極の視認性・コンパクト・モバイル2列CSS
+# 🎨 究極の視認性・コンパクト・モバイル2列絶対強制CSS
 # ==========================================
 st.markdown("""
     <style>
@@ -51,7 +51,7 @@ st.markdown("""
         text-shadow: 2px 2px 4px rgba(0,0,0,1.0) !important;
     }
 
-    /* 3. 画像のズレ防止（等高コンテナ） */
+    /* 3. 画像コンテナ（等高・整列） */
     .product-image-container {
         display: flex;
         justify-content: center;
@@ -90,7 +90,7 @@ st.markdown("""
     [data-testid="stHeader"] {display: none;}
 
     /* ==========================================
-       📱 モバイル表示（スマホ）の2列強制・最適化
+       📱 モバイル表示（スマホ）の2列強制・絶対命令
        ========================================== */
     @media screen and (max-width: 800px) {
         .main-title {
@@ -100,35 +100,37 @@ st.markdown("""
             margin-top: 1rem !important;
         }
         
-        /* コンテナの横並びを強制 */
+        /* 1カラム化（縦並び）を完全に阻止し、横2列を死守する */
         div[data-testid="stHorizontalBlock"] {
             display: flex !important;
             flex-direction: row !important;
             flex-wrap: wrap !important;
-            gap: 10px !important;
+            width: 100% !important;
+            gap: 0 !important;
         }
         
-        /* 各カラムを確実に50%幅にする（Streamlitの100%強制を上書き） */
+        /* カラム要素を確実に50%幅にする */
         div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
-            width: calc(50% - 5px) !important;
-            flex: 0 0 calc(50% - 5px) !important;
-            min-width: calc(50% - 5px) !important;
-            max-width: calc(50% - 5px) !important;
-            padding: 2px !important;
+            width: 50% !important;
+            flex: 0 0 50% !important;
+            min-width: 50% !important;
+            max-width: 50% !important;
+            padding: 6px !important;
         }
 
         .product-title {
             font-size: 0.8rem !important;
-            height: 3.0em !important;
+            height: 2.4em !important;
+            margin-bottom: 2px;
         }
         .product-details {
-            font-size: 0.7rem !important;
-            height: 4.0em !important;
+            font-size: 0.65rem !important;
+            height: 3.9em !important;
+            margin-bottom: 4px;
         }
         
-        /* 写真の縦横比を改善（2列なら140px程度が最適） */
         .product-image-container {
-            height: 140px !important;
+            height: 150px !important;
         }
     }
 
@@ -386,7 +388,7 @@ if st.session_state.generated:
     else:
         st.caption(f"【コンパクトモード】 {len(filtered)} 品番 / {int(total_q)} 点")
 
-    # 👇 コンパクトモードでも常にQRコードとHTML保存を表示
+    # コンパクトモードでも常にQRコードとHTML保存を表示
     st.markdown("<h3 class='no-print'>📱 スマホ転送・出力</h3>", unsafe_allow_html=True)
     btn1, btn2 = st.columns(2)
     with btn1:
