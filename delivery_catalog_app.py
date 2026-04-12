@@ -64,7 +64,7 @@ st.markdown("""
         box-shadow: 0 4px 10px rgba(0,0,0,0.6);
     }
 
-    /* 画像をハッキリ表示 */
+    /* 画像をハッキリ表示（薄さを解消） */
     .product-image-container img {
         max-height: 100%;
         max-width: 100%;
@@ -83,11 +83,9 @@ st.markdown("""
         text-shadow: 1px 1px 3px rgba(0,0,0,1.0);
     }
 
-    /* 💡 修正：メニューボタンを消さないようにヘッダー隠蔽を調整 */
+    /* メニューボタンを消さないように調整 */
     footer {visibility: hidden;}
     [data-testid="stDecoration"] {display: none;}
-    
-    /* ヘッダー全体を消すのではなく、背景を透明にしてボタンだけ残す */
     [data-testid="stHeader"] {
         background: transparent !important;
     }
@@ -159,7 +157,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 削除確認ダイアログ
+# ダイアログ・関数
 # ==========================================
 @st.dialog("データの全消去")
 def confirm_reset():
@@ -263,7 +261,7 @@ if "generated" not in st.session_state:
 
 with st.sidebar:
     st.header("⚙️ 設定・管理")
-    # 👇 デフォルト検索スピードを5に設定
+    # ⚡ デフォルト検索スピードを5に固定
     concurrency = st.slider("⚡ 検索スピード", 1, 10, 5)
     is_print_mode = st.toggle("コンパクトモード", value=False)
     
@@ -272,14 +270,16 @@ with st.sidebar:
 
     st.write("---")
     
-    # 👇 絞り込みセクション
+    # 🎯 絞り込みセクション
     if st.session_state.generated:
         st.subheader("🎯 絞り込み")
         
+        # ✨ 新規入荷のみチェック
         is_new_only = st.checkbox("✨ 新規入荷のみ", key="new_only_toggle")
 
         items = st.session_state.catalog_items
-        unique_bs = sorted(list(set([i["bs"] for i in items if i.get("bs")])))
+        # 👇 【修正】カテゴリー(BS)を正しく抽出
+        unique_bs = sorted(list(set([str(i["bs"]) for i in items if i.get("bs") and str(i.get("bs")).strip() != ""])))
         
         def set_all_bs(state):
             for b in unique_bs: st.session_state[f"chk_{b}"] = state
@@ -291,8 +291,9 @@ with st.sidebar:
         sel_bs = []
         if unique_bs:
             with st.container(height=200):
+                # 👇 【修正】ここがサイズではなくカテゴリー(BS)であることを保証
                 for b in unique_bs:
-                    if st.checkbox(b, key=f"chk_{b}"): sel_bs.append(b)
+                    if st.checkbox(f"BS: {b}", key=f"chk_{b}"): sel_bs.append(b)
         
         st.write("---")
         if st.button("🗑️ リセット", type="secondary", use_container_width=True):
@@ -323,12 +324,13 @@ if not st.session_state.generated:
                 c1, c2, c3 = st.columns(3)
                 with c1:
                     code_col = st.selectbox("Article", columns, index=guess_column_index(columns, ['artno', 'article', 'art', 'code']))
-                    size_col = st.selectbox("Size", ["(なし)"] + columns, index=guess_column_index(columns, ['size', 'サイズ'])+1)
+                    size_col = st.selectbox("Size", columns, index=guess_column_index(columns, ['size', 'サイズ']))
                 with c2:
                     name_col = st.selectbox("Name", columns, index=guess_column_index(columns, ['商品名称', '名称', 'name', 'item']))
-                    qty_col = st.selectbox("Qty", ["(なし)"] + columns, index=guess_column_index(columns, ['qty', '数量'])+1)
+                    qty_col = st.selectbox("Qty", columns, index=guess_column_index(columns, ['qty', '数量']))
                 with c3:
-                    bs_col = st.selectbox("BS", columns if 'bs' in [str(c).lower() for c in columns] else ["(なし)"]+columns, index=guess_column_index(columns, ['bs', 'category'])+1)
+                    # 👇 【修正】カテゴリー(BS)の自動検出キーワードを強化
+                    bs_col = st.selectbox("BS (カテゴリー)", columns, index=guess_column_index(columns, ['bs', 'category', '部門', 'カテゴリ', 'division']))
                     status_col = st.selectbox("Status", ["(なし)"] + columns, index=len(columns))
 
             if st.button("カタログ作成開始", type="primary", use_container_width=True):
@@ -338,7 +340,7 @@ if not st.session_state.generated:
                     code_str = str(code).strip()
                     size_dict, total_qty = {}, 0
                     for _, row in group.iterrows():
-                        s_val, q_val = str(row[size_col]).strip() if size_col != "(なし)" else "", str(row[qty_col]).strip() if qty_col != "(なし)" else "0"
+                        s_val, q_val = str(row[size_col]).strip(), str(row[qty_col]).strip()
                         try: q_num = float(q_val)
                         except: q_num = 0
                         total_qty += q_num
@@ -354,7 +356,8 @@ if not st.session_state.generated:
                     code, name = str(row[code_col]).strip(), str(row[name_col]).strip()
                     if not code or code.lower() in ['nan', 'none']: return idx, None
                     img = get_best_image(code, name)
-                    return idx, {"code": code, "name": name, "bs": str(row[bs_col]) if bs_col != "(なし)" else "",
+                    # 👇 【修正】ここでBSに確実にカテゴリー列のデータを入れる
+                    return idx, {"code": code, "name": name, "bs": str(row[bs_col]).strip() if bs_col != "(なし)" else "",
                                "size": agg_sizes.get(code, ""), "qty": agg_qtys.get(code, ""),
                                "status": str(row[status_col]) if status_col != "(なし)" else "",
                                "auto_url": img["url"] if img else None, "source": img["source"] if img else None, "manual_url": ""}
@@ -374,7 +377,7 @@ if not st.session_state.generated:
         except Exception as e: st.error(f"エラー: {e}")
 
 if st.session_state.generated:
-    # --- 絞り込みロジックの適用 ---
+    # 絞り込みロジックの適用
     items = st.session_state.catalog_items
     filtered = items
     
@@ -384,7 +387,7 @@ if st.session_state.generated:
     if is_new_only:
         filtered = [i for i in filtered if str(i.get("status", "")).strip().upper() in ["#N/A", "#REF!", "NAN", ""]]
 
-    # --- UI表示 ---
+    # UI表示
     total_q = sum([float(i.get("qty",0)) if i.get("qty") else 0 for i in filtered])
     
     if not is_print_mode:
@@ -392,7 +395,7 @@ if st.session_state.generated:
     else:
         st.caption(f"【コンパクトモード】 {len(filtered)} 品番 / {int(total_q)} 点")
 
-    # コンパクトモードでも常にQRコードとHTML保存を表示
+    # 📱 スマホ転送・出力セクション
     st.markdown("<h3 class='no-print'>📱 スマホ転送・出力</h3>", unsafe_allow_html=True)
     btn1, btn2 = st.columns(2)
     with btn1:
@@ -403,7 +406,7 @@ if st.session_state.generated:
         qr_html = f'<div style="display:flex; justify-content:center;"><div id="qrcode" style="background:white;padding:10px;border-radius:8px;"></div></div><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script><script>var url = window.parent.location.href.split("?")[0] + "?sid={sid}"; new QRCode(document.getElementById("qrcode"), {{text:url, width:120, height:120}});</script>'
         components.html(qr_html, height=150)
 
-    # --- カタログ本体 ---
+    # カタログ本体
     num_cols = 5 if is_print_mode else 3
     img_h = "140px" if is_print_mode else "260px"
     for i in range(0, len(filtered), num_cols):
