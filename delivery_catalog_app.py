@@ -280,7 +280,49 @@ if not st.session_state.generated:
             
             if st.button("全件の画像を取得して作成", use_container_width=True):
                 display_df = df[df[code_col].astype(str).str.strip() != ""]
+                
+                # --- 追加：サイズと数量の集計処理 ---
+                aggregated_sizes = {}
+                aggregated_qtys = {}
+                
+                for code, group in display_df.groupby(code_col):
+                    code_str = str(code).strip()
+                    size_dict = {}
+                    total_qty = 0
+                    
+                    for _, row in group.iterrows():
+                        s_val = str(row[size_col]).strip() if size_col != "(なし)" else ""
+                        q_val = str(row[qty_col]).strip() if qty_col != "(なし)" else ""
+                        if s_val.lower() == 'nan': s_val = ""
+                        if q_val.lower() == 'nan': q_val = ""
+                        
+                        q_num = 0
+                        try:
+                            if q_val: q_num = float(q_val)
+                        except: pass
+                        
+                        total_qty += q_num
+                        
+                        if s_val:
+                            if s_val in size_dict:
+                                size_dict[s_val] += q_num
+                            else:
+                                size_dict[s_val] = q_num
+                    
+                    size_list = []
+                    for s, q in size_dict.items():
+                        q_str = str(int(q)) if q == int(q) else str(q)
+                        if q > 0:
+                            size_list.append(f"{s}({q_str})")
+                        else:
+                            size_list.append(s)
+                            
+                    aggregated_sizes[code_str] = ", ".join(size_list)
+                    t_q_str = str(int(total_qty)) if total_qty == int(total_qty) else str(total_qty)
+                    aggregated_qtys[code_str] = t_q_str if total_qty > 0 else ""
+
                 display_df = display_df.drop_duplicates(subset=[code_col])
+                # --- 集計処理ここまで ---
                 
                 st.info(f"自動検索中... ({len(display_df)}件)")
                 p_bar = st.progress(0)
@@ -290,8 +332,9 @@ if not st.session_state.generated:
                     idx_num, row = args
                     code, name = str(row[code_col]).strip(), str(row[name_col]).strip()
                     bs_val = str(row[bs_col]).strip() if bs_col != "(なし)" else ""
-                    size_val = str(row[size_col]).strip() if size_col != "(なし)" else ""
-                    qty_val = str(row[qty_col]).strip() if qty_col != "(なし)" else ""
+                    # 個別の行からではなく、集計した辞書から取得するよう変更
+                    size_val = aggregated_sizes.get(code, "")
+                    qty_val = aggregated_qtys.get(code, "")
                     st_val = str(row[status_col]).strip() if status_col != "(なし)" else ""
                     
                     if not code or code.lower() == 'nan' or code.lower() == 'none': return idx_num, None
