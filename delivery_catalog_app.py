@@ -89,24 +89,32 @@ st.markdown("""
     [data-testid="stDecoration"] {display: none;}
     [data-testid="stHeader"] {display: none;}
 
-    /* 📱 モバイル表示（スマホ）の劇的コンパクト化 */
-    @media screen and (max-width: 600px) {
+    /* ==========================================
+       📱 モバイル表示（スマホ）の劇的コンパクト化（2列強制）
+       ========================================== */
+    @media screen and (max-width: 768px) {
         .main-title {
             font-size: 1.6rem !important;
             border-left-width: 8px;
             padding-left: 12px;
             margin-top: 1rem !important;
         }
-        [data-testid="stHorizontalBlock"] {
+        
+        /* 強制的に横2列にするための設定 */
+        div[data-testid="stHorizontalBlock"] {
             display: flex !important;
             flex-direction: row !important;
             flex-wrap: wrap !important;
+            align-items: stretch !important;
         }
-        [data-testid="stHorizontalBlock"] > div {
+        
+        div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
             width: 50% !important;
             flex: 1 1 50% !important;
             min-width: 50% !important;
+            padding: 4px !important;
         }
+
         .product-title {
             font-size: 0.75rem !important;
             height: 3.6em !important;
@@ -115,8 +123,9 @@ st.markdown("""
             font-size: 0.65rem !important;
             height: 4.5em !important;
         }
-        div[data-testid="column"] {
-            padding: 4px !important;
+        
+        .product-image-container {
+            height: 120px !important; /* スマホでは高さを抑える */
         }
     }
 
@@ -246,7 +255,7 @@ if "generated" not in st.session_state:
 
 with st.sidebar:
     st.header("⚙️ 設定・管理")
-    concurrency = st.slider("⚡ 検索スピード", 1, 10, 3)
+    concurrency = st.slider("⚡ 検索スピード", 1, 10, 5)
     is_print_mode = st.toggle("コンパクトモード", value=False)
     
     if st.button("🖨️ カタログを印刷", use_container_width=True, type="primary"):
@@ -374,7 +383,7 @@ if st.session_state.generated:
     else:
         st.caption(f"【コンパクトモード】 {len(filtered)} 品番 / {int(total_q)} 点")
 
-    # 👇 コンパクトモードでも常にQRコードとHTML保存を表示するように外出し
+    # 👇 コンパクトモードでも常にQRコードとHTML保存を表示
     st.markdown("<h3 class='no-print'>📱 スマホ転送・出力</h3>", unsafe_allow_html=True)
     btn1, btn2 = st.columns(2)
     with btn1:
