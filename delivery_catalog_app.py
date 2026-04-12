@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import requests
@@ -287,14 +288,27 @@ if st.session_state.generated:
     filtered = items
     st.markdown("<h3 class='no-print'>🎯 絞り込み</h3>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
+    
     with c1:
         unique_bs = sorted(list(set([i["bs"] for i in items if i.get("bs")])))
+        
+        # 👇 修正：全てを選択・全てを解除ボタンの追加
+        btn_col1, btn_col2 = st.columns(2)
+        if btn_col1.button("全て選択", use_container_width=True, key="sel_all"):
+            for b in unique_bs: st.session_state[f"chk_{b}"] = True
+            st.rerun()
+        if btn_col2.button("全て解除", use_container_width=True, key="unsel_all"):
+            for b in unique_bs: st.session_state[f"chk_{b}"] = False
+            st.rerun()
+            
         sel_bs = []
         if unique_bs:
             with st.container(height=150):
                 for b in unique_bs:
+                    # session_stateを介してチェック状態を管理
                     if st.checkbox(b, key=f"chk_{b}"): sel_bs.append(b)
         if sel_bs: filtered = [i for i in filtered if i["bs"] in sel_bs]
+        
     with c2:
         if st.toggle("✨ 新規入荷のみ"):
             filtered = [i for i in filtered if str(i.get("status", "")).strip().upper() in ["#N/A", "#REF!", "NAN", "NONE", "", "NULL"]]
@@ -318,24 +332,18 @@ if st.session_state.generated:
                 st.markdown(f"**{item['name']}**")
                 st.caption(f"{item['code']} / {item['size']} / {item['qty']}点 / {item['status']}")
                 
-                # 画像の決定（手動URLがあれば優先）
                 disp_url = item.get("manual_url") if item.get("manual_url") else item.get("auto_url")
                 
-                # 画像枠
                 if disp_url: st.markdown(f'<div style="height:{img_h};display:flex;justify-content:center;background:#fff;border-radius:6px;border:1px solid #eee;overflow:hidden;"><img src="{disp_url}" style="max-height:100%;max-width:100%;object-fit:contain;"></div>', unsafe_allow_html=True)
                 else: st.markdown(f'<div style="height:{img_h};display:flex;justify-content:center;align-items:center;background:#f8f9fa;border-radius:6px;border:1px solid #ddd;color:#999;">画像なし</div>', unsafe_allow_html=True)
                 
-                # 👇 ここから「Google検索」と「URL貼り付け」を復活
                 if not is_print_mode:
-                    # Google画像検索ボタン
                     st.markdown(f"🔍 [Google検索](https://www.google.com/search?tbm=isch&q=adidas+{item['code']})")
-                    
-                    # URL貼り付けボックス
                     new_url = st.text_input("画像URLを貼り付け", value=item.get("manual_url", ""), key=f"inp_{item['code']}")
                     if new_url != item.get("manual_url"):
                         item["manual_url"] = new_url
                         save_auto_save_data(st.session_state.catalog_items)
-                        st.rerun() # 即時反映
+                        st.rerun()
                     
                     if item.get('source'): st.caption(f"元:{item['source']}")
                     st.write("---")
