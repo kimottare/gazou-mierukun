@@ -11,7 +11,7 @@ import socket
 import uuid
 import streamlit.components.v1 as components
 
-# --- 🌟 楽天アプリID ---
+# --- 🌟 設定 ---
 RAKUTEN_APP_ID = "9fd3dd97-a071-4e2b-8579-dec02ea27217" 
 AUTO_SAVE_FILE = "auto_save_catalog.json" 
 
@@ -21,29 +21,51 @@ def get_shared_store():
 
 st.set_page_config(page_title="商品画像見える君", layout="wide")
 
-# 👇 CSS: ヘッダー非表示・印刷時の最適化
+# ==========================================
+# 🎨 CSS：画面表示 & 印刷用の最強レイアウト
+# ==========================================
 st.markdown("""
     <style>
+    /* 共通：不要なStreamlitパーツの隠蔽 */
     header {visibility: hidden;}
     footer {visibility: hidden;}
     [data-testid="stDecoration"] {display: none;}
+    [data-testid="stHeader"] {display: none;}
 
-    /* 印刷時の設定 */
+    /* 画面表示用の調整 */
+    .main .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+    }
+
+    /* 印刷時の設定（ここを徹底強化） */
     @media print {
-        header, [data-testid="stSidebar"], [data-testid="stToolbar"], .stButton, .stDownloadButton, [data-testid="stExpander"],
-        [data-testid="stMultiSelect"], [data-testid="stCheckbox"], iframe, .no-print, .stTabs {
+        /* サイドバー、ツールバー、ボタン、入力欄、QRコード、説明文などをすべて消去 */
+        header, [data-testid="stSidebar"], [data-testid="stToolbar"], 
+        .stButton, .stDownloadButton, [data-testid="stExpander"],
+        [data-testid="stMultiSelect"], [data-testid="stCheckbox"], 
+        .no-print, .stTabs, iframe, .stTextInput, .stAlert, hr {
             display: none !important;
         }
+
+        /* コンテンツエリアを紙面いっぱいに広げる */
         .main .block-container {
-            padding-top: 0rem !important;
-            padding-bottom: 0rem !important;
+            max-width: 100% !important;
+            padding: 0 !important;
             margin: 0 !important;
         }
-        div[data-testid="stVerticalBlock"] > div {
-            padding: 0 !important;
+
+        /* 商品カードの改ページ制御 */
+        div[data-testid="column"] {
+            break-inside: avoid;
+            page-break-inside: avoid;
         }
-        body, .stApp, .main, .block-container, div[data-testid="stAppViewContainer"] {
+
+        /* 背景色や画像を強制的に印刷（ブラウザ設定によるが可能な限り） */
+        body {
             background-color: white !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
         }
     }
     </style>
@@ -55,6 +77,7 @@ st.markdown("""
 @st.dialog("データの全消去")
 def confirm_reset():
     st.warning("現在表示されているリストと保存データをすべて削除します。よろしいですか？")
+    st.write("※この操作は取り消せません。")
     col1, col2 = st.columns(2)
     if col1.button("はい、削除します", type="primary", use_container_width=True):
         st.session_state.generated = False
@@ -66,43 +89,15 @@ def confirm_reset():
         st.rerun()
 
 # ==========================================
-# ロジック・ヘルパー
+# ロジック・ヘルパー関数
 # ==========================================
 def generate_html_report(items):
     now_str = datetime.datetime.now().strftime("%Y年%m月%d日 %H:%M")
-    html_content = f"""
-    <!DOCTYPE html>
-    <html lang="ja">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>入荷予定カタログ</title>
-        <style>
-            body {{ font-family: -apple-system, sans-serif; background-color: #f0f2f5; padding: 10px; }}
-            h1 {{ text-align: center; font-size: 1.2rem; border-bottom: 2px solid #333; padding-bottom: 10px; }}
-            .grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }}
-            .card {{ background: #fff; border-radius: 8px; padding: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
-            .img-box {{ height: 150px; display: flex; justify-content: center; align-items: center; overflow: hidden; }}
-            .img-box img {{ max-height: 100%; max-width: 100%; object-fit: contain; }}
-            .title {{ font-weight: bold; font-size: 0.8rem; margin: 5px 0; }}
-            .info {{ font-size: 0.7rem; color: #666; }}
-        </style>
-    </head>
-    <body>
-        <h1>📦 商品カタログ ({len(items)}件)</h1>
-        <div class="grid">
-    """
+    html_content = f"""<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>商品カタログ</title><style>body {{ font-family: sans-serif; padding: 20px; }} .grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }} .card {{ border: 1px solid #eee; padding: 10px; border-radius: 8px; }} .img-box {{ height: 180px; display: flex; justify-content: center; align-items: center; }} img {{ max-height: 100%; max-width: 100%; object-fit: contain; }} .code {{ font-size: 0.8rem; color: #666; }}</style></head><body><h1>📦 商品カタログ ({len(items)}件)</h1><div class="grid">"""
     for item in items:
         url = item.get("manual_url") or item.get("auto_url") or ""
-        img_tag = f'<img src="{url}">' if url else '<div style="color:#ccc;">No Image</div>'
-        html_content += f"""
-            <div class="card">
-                <div class="img-box">{img_tag}</div>
-                <div class="title">{item.get('name','')}</div>
-                <div class="info">Art: {item.get('code','')}<br>Qty: {item.get('qty','')} / BS: {item.get('bs','')}</div>
-            </div>
-        """
-    html_content += f"</div><div style='text-align:center; font-size:0.7rem; margin-top:20px;'>{now_str}</div></body></html>"
+        html_content += f'<div class="card"><div class="img-box"><img src="{url}"></div><div style="font-weight:bold; font-size:0.9rem;">{item.get("name","")}</div><div class="code">Art: {item.get("code","")}<br>Qty: {item.get("qty","")} / BS: {item.get("bs","")}</div></div>'
+    html_content += f"</div><p style='text-align:center; font-size:0.7rem;'>作成日時: {now_str}</p></body></html>"
     return html_content
 
 def is_valid_adidas_img(url):
@@ -124,19 +119,6 @@ def scrape_bing_high_res_image(query, code):
     except: pass
     return None, False
 
-def scrape_yahoo_image(query, code):
-    url = f"https://search.yahoo.co.jp/image/search?p={query}"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    try:
-        res = requests.get(url, headers=headers, timeout=3)
-        soup = BeautifulSoup(res.text, 'html.parser')
-        for img in soup.find_all('img'):
-            src = img.get('src')
-            if src and src.startswith("http") and str(code).strip().lower() in src.lower() and is_valid_adidas_img(src):
-                return src, True
-    except: pass
-    return None, False
-
 def get_rakuten_image(code):
     if not RAKUTEN_APP_ID: return None, False
     url = "https://app.rakuten.co.jp/services/api/IchibaItem/Search/20220601"
@@ -155,12 +137,10 @@ def get_rakuten_image(code):
 def get_best_image(code, name=""):
     code_str = str(code).strip().upper()
     query = f"adidas {name} {code_str}".strip()
-    rakuten_url, rakuten_exact = get_rakuten_image(code_str)
-    if rakuten_exact: return {"url": rakuten_url, "source": "楽天公式"}
+    rak_url, rak_exact = get_rakuten_image(code_str)
+    if rak_exact: return {"url": rak_url, "source": "楽天公式"}
     bing_url, bing_exact = scrape_bing_high_res_image(query, code_str)
     if bing_exact: return {"url": bing_url, "source": "Bing検索"}
-    yahoo_url, yahoo_exact = scrape_yahoo_image(query, code_str)
-    if yahoo_exact: return {"url": yahoo_url, "source": "Yahoo検索"}
     return None
 
 def guess_column_index(columns, keywords, default_idx=0):
@@ -203,15 +183,15 @@ with st.sidebar:
     concurrency = st.slider("⚡ 画像取得スピード", 1, 10, 3)
     is_print_mode = st.toggle("印刷用コンパクト表示モード", value=False)
     
-    # 👇 印刷実行ボタン
-    if st.button("🖨️ 今すぐ印刷する (Ctrl+P)", use_container_width=True):
-        components.html("<script>window.print();</script>", height=0)
+    # 👇 印刷実行：親ウィンドウを対象にするように修正
+    if st.button("🖨️ 今すぐ印刷する", use_container_width=True, type="primary"):
+        components.html("<script>window.parent.print();</script>", height=0)
 
     st.write("---")
     if st.session_state.generated:
         json_string = json.dumps(st.session_state.catalog_items, ensure_ascii=False, indent=2)
         st.download_button("データを保存 (.json)", json_string, "catalog_backup.json", "application/json", use_container_width=True)
-        if st.button("🗑️ リセット", type="primary", use_container_width=True):
+        if st.button("🗑️ リセット", type="secondary", use_container_width=True):
             confirm_reset()
 
 if not st.session_state.generated:
@@ -224,9 +204,11 @@ if not st.session_state.generated:
                 except: df = pd.read_csv(uploaded_file, na_filter=False, dtype=str, header=None, encoding='cp932')
             else: df = pd.read_excel(uploaded_file, na_filter=False, dtype=str, header=None)
             
+            # ヘッダー検知（画像のバグ修正：型変換を安全に）
             header_idx = 0
             for i, row in df.iterrows():
-                if sum(1 for val in row if str(val).strip() != "" and str(val).lower() != "nan") >= 3:
+                row_vals = [str(v) for v in row if v is not None]
+                if sum(1 for v in row_vals if v.strip() != "" and v.lower() != "nan") >= 3:
                     header_idx = i
                     break
             df.columns = df.iloc[header_idx].tolist()
@@ -293,7 +275,7 @@ if st.session_state.generated:
     items = st.session_state.catalog_items
     filtered = items
     
-    # 👇 コンパクトモード時は「絞り込み」と「QR」を非表示にして無駄なスペースを省く
+    # 👇 コンパクトモード時は作業UIを非表示
     if not is_print_mode:
         st.markdown("<h3 class='no-print'>🎯 絞り込み</h3>", unsafe_allow_html=True)
         c1, c2 = st.columns(2)
@@ -301,9 +283,9 @@ if st.session_state.generated:
             unique_bs = sorted(list(set([i["bs"] for i in items if i.get("bs")])))
             def set_all_bs(state):
                 for b in unique_bs: st.session_state[f"chk_{b}"] = state
-            btn_col1, btn_col2 = st.columns(2)
-            btn_col1.button("全て選択", use_container_width=True, on_click=set_all_bs, args=(True,))
-            btn_col2.button("全て解除", use_container_width=True, on_click=set_all_bs, args=(False,))
+            bc1, bc2 = st.columns(2)
+            bc1.button("全て選択", use_container_width=True, on_click=set_all_bs, args=(True,))
+            bc2.button("全て解除", use_container_width=True, on_click=set_all_bs, args=(False,))
             sel_bs = []
             if unique_bs:
                 with st.container(height=150):
@@ -312,13 +294,12 @@ if st.session_state.generated:
             if sel_bs: filtered = [i for i in filtered if i["bs"] in sel_bs]
         with c2:
             if st.toggle("✨ 新規入荷のみ"):
-                filtered = [i for i in filtered if str(i.get("status", "")).strip().upper() in ["#N/A", "#REF!", "NAN", "NONE", "", "NULL"]]
+                filtered = [i for i in filtered if str(i.get("status", "")).strip().upper() in ["#N/A", "#REF!", "NAN", "NONE", ""]]
 
-        # カウンター
-        total_q_sum = sum([float(i.get("qty",0)) if i.get("qty") else 0 for i in filtered])
-        st.info(f"📦 現在の表示: **{len(filtered)}** 品番 / 合計数量: **{int(total_q_sum) if total_q_sum==int(total_q_sum) else total_q_sum}** 点")
-
-        # スマホ転送
+        # カウンター & スマホ転送
+        total_q = sum([float(i.get("qty",0)) if i.get("qty") else 0 for i in filtered])
+        st.info(f"📦 現在の表示: **{len(filtered)}** 品番 / 合計数量: **{int(total_q) if total_q==int(total_q) else total_q}** 点")
+        
         st.markdown("<h3 class='no-print'>📱 スマホ転送</h3>", unsafe_allow_html=True)
         cdl, cqr = st.columns(2)
         with cdl: st.download_button("HTML保存", generate_html_report(filtered), "catalog.html", "text/html", use_container_width=True)
@@ -328,9 +309,9 @@ if st.session_state.generated:
             qr_html = f'<div style="display:flex; justify-content:center;"><div id="qrcode" style="background:white;padding:10px;border-radius:8px;"></div></div><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script><script>var url = window.parent.location.href.split("?")[0] + "?sid={sid}"; new QRCode(document.getElementById("qrcode"), {{text:url, width:128, height:128}});</script>'
             components.html(qr_html, height=160)
     else:
-        # コンパクトモード時も件数だけは一応出す（が、非常に小さく）
-        total_q_sum = sum([float(i.get("qty",0)) if i.get("qty") else 0 for i in filtered])
-        st.caption(f"表示中: {len(filtered)} 品番 / {int(total_q_sum) if total_q_sum==int(total_q_sum) else total_q_sum} 点")
+        # コンパクトモード時：カウンターを非常に控えめに表示
+        total_q = sum([float(i.get("qty",0)) if i.get("qty") else 0 for i in filtered])
+        st.caption(f"表示中: {len(filtered)} 品番 / {int(total_q)} 点")
 
     # --- カタログ表示本体 ---
     num_cols = 4 if is_print_mode else 3
@@ -339,19 +320,22 @@ if st.session_state.generated:
         cols = st.columns(num_cols) 
         for j, item in enumerate(filtered[i:i+num_cols]):
             with cols[j]:
+                # タイトルと情報
                 st.markdown(f"**{item['name']}**")
                 st.caption(f"{item['code']} / {item['size']} / {item['qty']}点 / {item['status']}")
-                disp_url = item.get("manual_url") or item.get("auto_url")
-                if disp_url: st.markdown(f'<div style="height:{img_h};display:flex;justify-content:center;background:#fff;border-radius:6px;border:1px solid #eee;overflow:hidden;"><img src="{disp_url}" style="max-height:100%;max-width:100%;object-fit:contain;"></div>', unsafe_allow_html=True)
+                
+                # 画像
+                url = item.get("manual_url") or item.get("auto_url")
+                if url: st.markdown(f'<div style="height:{img_h};display:flex;justify-content:center;background:#fff;border-radius:6px;border:1px solid #eee;overflow:hidden;"><img src="{url}" style="max-height:100%;max-width:100%;object-fit:contain;"></div>', unsafe_allow_html=True)
                 else: st.markdown(f'<div style="height:{img_h};display:flex;justify-content:center;align-items:center;background:#f8f9fa;border-radius:6px;border:1px solid #ddd;color:#999;">画像なし</div>', unsafe_allow_html=True)
                 
-                # コンパクトモード時は編集UIを隠す
+                # コンパクトモード以外：編集UI
                 if not is_print_mode:
                     st.markdown(f"🔍 [Google検索](https://www.google.com/search?tbm=isch&q=adidas+{item['code']})")
-                    new_url = st.text_input("URL貼り付け", value=item.get("manual_url", ""), key=f"inp_{item['code']}")
-                    if new_url != item.get("manual_url"):
-                        item["manual_url"] = new_url
-                        save_auto_save_data(st.session_state.catalog_items)
+                    new_u = st.text_input("URL貼り付け", value=item.get("manual_url", ""), key=f"inp_{item['code']}")
+                    if new_u != item.get("manual_url"):
+                        item["manual_url"] = new_u
+                        save_auto_save_data(items)
                         st.rerun()
                     if item.get('source'): st.caption(f"元:{item['source']}")
                     st.write("---")
