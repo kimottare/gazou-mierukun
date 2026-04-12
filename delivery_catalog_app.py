@@ -32,22 +32,26 @@ st.markdown("""
         background-color: #0e1117;
     }
 
-    /* 2. 右上の不要なボタンを消し、左上のサイドバーボタンだけを残す */
+    /* 2. 【最重要】ハンバーガーボタンを救出し、右側だけを消す */
     [data-testid="stHeader"] {
         background-color: rgba(0,0,0,0) !important;
+        visibility: visible !important; /* ヘッダー自体は見せる */
     }
-    /* Share, Star, GitHubなどのツールバーのみを消去 */
+    /* 右上のShare, Star, GitHubメニューのみを抹殺 */
     [data-testid="stToolbar"] {
         display: none !important;
+        visibility: hidden !important;
     }
-    /* サイドバー開閉ボタンを強調（消さない） */
+    /* 左上のハンバーガーボタンを「浮かび上がらせる」 */
     button[data-testid="stSidebarCollapseButton"] {
-        background-color: rgba(255,255,255,0.1) !important;
-        border-radius: 5px !important;
-        color: white !important;
+        visibility: visible !important;
+        display: block !important;
+        color: #ffffff !important; /* ボタンの色を白に固定 */
+        background-color: rgba(255,255,255,0.2) !important; /* 少し背景をつけて見やすく */
+        z-index: 999999 !important;
     }
 
-    /* 3. タイトル・文字視認性（強力シャドウ） */
+    /* 3. タイトル・文字視認性 */
     .main-title {
         font-size: 2.5rem !important; font-weight: 900 !important; color: #ffffff !important;
         text-shadow: 3px 3px 12px rgba(0,0,0,1.0), 0 0 25px rgba(0,0,0,0.8) !important;
@@ -72,9 +76,7 @@ st.markdown("""
     }
     .product-image-container img { max-height: 100%; max-width: 100%; object-fit: contain; }
 
-    /* ==========================================
-       📱 スマホ表示（iPhone Edge/Safari）2列強制
-       ========================================== */
+    /* 📱 スマホ表示（2列強制） */
     @media screen and (max-width: 800px) {
         div[data-testid="stHorizontalBlock"] {
             display: flex !important; flex-direction: row !important;
@@ -85,7 +87,7 @@ st.markdown("""
             min-width: 50% !important; max-width: 50% !important; padding: 6px !important;
         }
         .product-image-container { height: 150px !important; }
-        .main-title { font-size: 1.5rem !important; border-left-width: 8px; }
+        .main-title { font-size: 1.5rem !important; border-left-width: 8px; padding-left: 12px; margin-top: 2rem !important; }
     }
 
     /* 🖨️ 印刷用：背景白・文字黒 */
@@ -100,7 +102,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 🔍 検索ロジック ---
+# --- 🔍 検索・ロジック補助 ---
 def guess_column_index(columns, keywords, default_idx=0, exclude=[]):
     for keyword in keywords:
         for idx, col in enumerate(columns):
@@ -195,7 +197,7 @@ if not st.session_state.generated:
             bs_c = c3.selectbox("BS (カテゴリー)", cols, index=guess_column_index(cols, ['BS'], exclude=['size', 'サイズ']))
             size_c = c1.selectbox("サイズ (Size)", cols, index=guess_column_index(cols, ['size', 'サイズ']))
             qty_c = c2.selectbox("数量 (Qty)", cols, index=guess_column_index(cols, ['qty', '数量']))
-            status_c = c3.selectbox("ステータス (Status)", cols, index=min(11, len(cols)-1)) # 列12デフォルト
+            status_c = c3.selectbox("ステータス (Status)", cols, index=min(11, len(cols)-1))
 
         if st.button("カタログ作成開始", type="primary", use_container_width=True):
             results = []
@@ -217,26 +219,26 @@ if not st.session_state.generated:
             save_auto_save_data(results)
             st.rerun()
 
-# --- 📊 表示エリア ---
+# --- 📊 メイン表示 ---
 if st.session_state.generated:
     display = [i for i in st.session_state.catalog_items if i.get("bs") in sel_bs]
     if is_new_only:
         display = [i for i in display if str(i.get("status", "")).upper() in ["#N/A", "#REF!", "NAN", "", "NEW"]]
 
-    # 🌟 総数表示の復旧
+    # 総数表示
     total_q = sum([float(str(i.get("qty", "0")).replace(',','')) if str(i.get("qty", "0")).replace('.','',1).isdigit() else 0 for i in display])
     st.info(f"📊 **{len(display)}** 品番 / 合計 **{int(total_q)}** 点 を表示中")
 
-    # 🌟 QRコードの復旧
+    # スマホ転送
     st.markdown("<h3 class='no-print'>📱 スマホ転送</h3>", unsafe_allow_html=True)
     sid = st.session_state.get("share_id", uuid.uuid4().hex[:8]); st.session_state.share_id = sid
     get_shared_store()[sid] = display
     qr_html = f'<div style="text-align:center;"><div id="qrcode" style="display:inline-block;background:white;padding:10px;border-radius:8px;"></div></div><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script><script>new QRCode(document.getElementById("qrcode"), {{text:window.parent.location.href.split("?")[0]+"?sid={sid}", width:120, height:120}});</script>'
     components.html(qr_html, height=150)
 
-    # 🌟 カタログ本体：通常モードを「3列」に変更
+    # 3列カタログ
     n_cols = 5 if is_print_mode else 3
-    img_h = "140px" if is_print_mode else "200px" # 3列に合わせた適切な高さ
+    img_h = "140px" if is_print_mode else "200px"
 
     for i in range(0, len(display), n_cols):
         cols = st.columns(n_cols) 
