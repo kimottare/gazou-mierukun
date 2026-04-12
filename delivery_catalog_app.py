@@ -21,9 +21,10 @@ def get_shared_store():
 
 st.set_page_config(page_title="商品画像見える君", layout="wide")
 
-# 👇 印刷設定 ＋ ヘッダー/フッター非表示
+# 👇 印刷設定 ＋ ヘッダー/フッター非表示（セキュリティ対策）
 st.markdown("""
     <style>
+    /* 右上のGitHubアイコン等と下部のロゴを非表示 */
     header {visibility: hidden;}
     footer {visibility: hidden;}
 
@@ -250,7 +251,7 @@ with st.sidebar:
             st.rerun()
 
 if not st.session_state.generated:
-    st.subheader("📝 新規リストから作成")
+    st.subheader("📝 新規リストを作成")
     uploaded_file = st.file_uploader("Excel/CSVをアップロード", type=['xlsx', 'xlsm', 'csv'])
     if uploaded_file:
         try:
@@ -288,7 +289,8 @@ if not st.session_state.generated:
                     code_col = st.selectbox("Articleの列", columns, index=guess_column_index(columns, ['artno', 'article', 'art', 'code']))
                     size_col = st.selectbox("サイズの列", ["(なし)"] + columns, index=guess_column_index(columns, ['size', 'サイズ'])+1)
                 with sel_col2:
-                    name_col = st.selectbox("Nameの列", columns, index=guess_column_index(columns, ['名称', 'name', 'item']))
+                    # 👇 修正：「商品名称」を最優先のキーワードに追加
+                    name_col = st.selectbox("Nameの列", columns, index=guess_column_index(columns, ['商品名称', '名称', 'name', 'item']))
                     qty_col = st.selectbox("数量の列", ["(なし)"] + columns, index=guess_column_index(columns, ['qty', '数量'])+1)
                 with sel_col3:
                     bs_col = st.selectbox("BSの列", ["(なし)"] + columns, index=guess_column_index(columns, ['bs', 'category'])+1)
@@ -366,7 +368,6 @@ if st.session_state.generated:
         if selected_bs: filtered_items = [item for item in filtered_items if item["bs"] in selected_bs]
 
     with f_col2:
-        # 👇 フィルタロジックを強化: #N/A, #REF!, NaN(空)を確実にキャッチ
         if st.toggle("✨ 新規入荷のみ"):
             error_vals = ["#N/A", "#REF!", "NAN", "NONE", "", "NULL"]
             filtered_items = [
