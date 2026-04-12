@@ -26,12 +26,12 @@ st.set_page_config(page_title="商品画像見える君", layout="wide")
 # ==========================================
 st.markdown("""
     <style>
-    /* 1. タイトルの視認性（白文字 + 影） */
+    /* 1. タイトルの視認性（白文字 + 強力なシャドウ） */
     .main-title {
         font-size: 2.8rem !important;
         font-weight: 900 !important;
         color: #ffffff !important;
-        text-shadow: 3px 3px 10px rgba(0,0,0,1.0), 0 0 25px rgba(0,0,0,0.6) !important;
+        text-shadow: 3px 3px 12px rgba(0,0,0,1.0), 0 0 25px rgba(0,0,0,0.8) !important;
         margin-top: 1.5rem !important;
         margin-bottom: 1.5rem !important;
         text-align: left;
@@ -48,7 +48,7 @@ st.markdown("""
         overflow: hidden;
         margin-bottom: 4px;
         color: #ffffff !important;
-        text-shadow: 2px 2px 4px rgba(0,0,0,1.0) !important;
+        text-shadow: 2px 2px 5px rgba(0,0,0,1.0) !important;
     }
 
     /* 3. 画像コンテナ（等高・整列） */
@@ -61,7 +61,7 @@ st.markdown("""
         border: 1px solid #333;
         overflow: hidden;
         margin-bottom: 8px;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.6);
     }
 
     /* 画像をハッキリ表示 */
@@ -83,7 +83,7 @@ st.markdown("""
         text-shadow: 1px 1px 3px rgba(0,0,0,1.0);
     }
 
-    /* UI隠蔽 */
+    /* Streamlit標準パーツの隠蔽 */
     header {visibility: hidden;}
     footer {visibility: hidden;}
     [data-testid="stDecoration"] {display: none;}
@@ -99,7 +99,7 @@ st.markdown("""
             padding-left: 12px;
             margin-top: 1rem !important;
         }
-        
+
         /* 1カラム化（縦並び）を完全に阻止し、横2列を死守する */
         div[data-testid="stHorizontalBlock"] {
             display: flex !important;
@@ -108,18 +108,18 @@ st.markdown("""
             width: 100% !important;
             gap: 0 !important;
         }
-        
-        /* カラム要素を確実に50%幅にする */
+
+        /* 各カラム要素を確実に50%幅で固定する（100%への拡大を阻止） */
         div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
             width: 50% !important;
             flex: 0 0 50% !important;
             min-width: 50% !important;
             max-width: 50% !important;
-            padding: 6px !important;
+            padding: 8px !important;
         }
 
         .product-title {
-            font-size: 0.8rem !important;
+            font-size: 0.85rem !important;
             height: 2.4em !important;
             margin-bottom: 2px;
         }
@@ -130,7 +130,7 @@ st.markdown("""
         }
         
         .product-image-container {
-            height: 150px !important;
+            height: 150px !important; /* スマホ2列時に適切なアスペクト比を維持 */
         }
     }
 
@@ -156,7 +156,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# ダイアログ・関数
+# 削除確認ダイアログ
 # ==========================================
 @st.dialog("データの全消去")
 def confirm_reset():
@@ -180,7 +180,7 @@ def generate_html_report(items):
     html_content += f"</div><p style='text-align:center;font-size:0.6rem;'>出力:{now_str}</p></body></html>"
     return html_content
 
-# --- 検索ロジック ---
+# --- 🔍 検索ロジック ---
 def is_valid_adidas_img(url):
     keywords = ["adidas", "yimg", "bing", "gstatic", "shop-adidas", "mm-adidas"]
     return any(k in url.lower() for k in keywords)
@@ -260,6 +260,7 @@ if "generated" not in st.session_state:
 
 with st.sidebar:
     st.header("⚙️ 設定・管理")
+    # 👇 デフォルト検索スピードを5に設定
     concurrency = st.slider("⚡ 検索スピード", 1, 10, 5)
     is_print_mode = st.toggle("コンパクトモード", value=False)
     
@@ -324,7 +325,7 @@ if not st.session_state.generated:
                     name_col = st.selectbox("Name", columns, index=guess_column_index(columns, ['商品名称', '名称', 'name', 'item']))
                     qty_col = st.selectbox("Qty", ["(なし)"] + columns, index=guess_column_index(columns, ['qty', '数量'])+1)
                 with c3:
-                    bs_col = st.selectbox("BS", ["(なし)"] + columns, index=guess_column_index(columns, ['bs', 'category'])+1)
+                    bs_col = st.selectbox("BS", columns if 'bs' in [str(c).lower() for c in columns] else ["(なし)"]+columns, index=guess_column_index(columns, ['bs', 'category'])+1)
                     status_col = st.selectbox("Status", ["(なし)"] + columns, index=len(columns))
 
             if st.button("カタログ作成開始", type="primary", use_container_width=True):
@@ -388,7 +389,7 @@ if st.session_state.generated:
     else:
         st.caption(f"【コンパクトモード】 {len(filtered)} 品番 / {int(total_q)} 点")
 
-    # コンパクトモードでも常にQRコードとHTML保存を表示
+    # 👇 コンパクトモードでも常にQRコードとHTML保存を表示
     st.markdown("<h3 class='no-print'>📱 スマホ転送・出力</h3>", unsafe_allow_html=True)
     btn1, btn2 = st.columns(2)
     with btn1:
