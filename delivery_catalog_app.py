@@ -22,7 +22,7 @@ def get_shared_store():
 st.set_page_config(page_title="商品画像見える君", layout="wide")
 
 # ==========================================
-# 🎨 究極の視認性・高密度・モバイル最適化CSS
+# 🎨 究極の視認性・コンパクト・モバイル2列CSS
 # ==========================================
 st.markdown("""
     <style>
@@ -90,9 +90,9 @@ st.markdown("""
     [data-testid="stHeader"] {display: none;}
 
     /* ==========================================
-       📱 モバイル表示（スマホ）の劇的コンパクト化（2列強制）
+       📱 モバイル表示（スマホ）の2列強制・最適化
        ========================================== */
-    @media screen and (max-width: 768px) {
+    @media screen and (max-width: 800px) {
         .main-title {
             font-size: 1.6rem !important;
             border-left-width: 8px;
@@ -100,32 +100,35 @@ st.markdown("""
             margin-top: 1rem !important;
         }
         
-        /* 強制的に横2列にするための設定 */
+        /* コンテナの横並びを強制 */
         div[data-testid="stHorizontalBlock"] {
             display: flex !important;
             flex-direction: row !important;
             flex-wrap: wrap !important;
-            align-items: stretch !important;
+            gap: 10px !important;
         }
         
+        /* 各カラムを確実に50%幅にする（Streamlitの100%強制を上書き） */
         div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
-            width: 50% !important;
-            flex: 1 1 50% !important;
-            min-width: 50% !important;
-            padding: 4px !important;
+            width: calc(50% - 5px) !important;
+            flex: 0 0 calc(50% - 5px) !important;
+            min-width: calc(50% - 5px) !important;
+            max-width: calc(50% - 5px) !important;
+            padding: 2px !important;
         }
 
         .product-title {
-            font-size: 0.75rem !important;
-            height: 3.6em !important;
+            font-size: 0.8rem !important;
+            height: 3.0em !important;
         }
         .product-details {
-            font-size: 0.65rem !important;
-            height: 4.5em !important;
+            font-size: 0.7rem !important;
+            height: 4.0em !important;
         }
         
+        /* 写真の縦横比を改善（2列なら140px程度が最適） */
         .product-image-container {
-            height: 120px !important; /* スマホでは高さを抑える */
+            height: 140px !important;
         }
     }
 
