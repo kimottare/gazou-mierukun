@@ -223,8 +223,6 @@ with st.sidebar:
 
     st.write("---")
     if st.session_state.generated:
-        json_string = json.dumps(st.session_state.catalog_items, ensure_ascii=False, indent=2)
-        st.download_button("JSON保存", json_string, "catalog_data.json", "application/json", use_container_width=True)
         if st.button("🗑️ リセット", type="secondary", use_container_width=True):
             confirm_reset()
 
@@ -313,7 +311,7 @@ if st.session_state.generated:
         with c1:
             unique_bs = sorted(list(set([i["bs"] for i in items if i.get("bs")])))
             
-            # 👇 【復元】チェックボックス方式のロジック
+            # 👇 チェックボックス方式のロジック
             def set_all_bs(state):
                 for b in unique_bs: st.session_state[f"chk_{b}"] = state
 
