@@ -15,10 +15,12 @@ AUTO_SAVE_FILE = "auto_save_catalog.json"
 
 st.set_page_config(page_title="商品画像見える君", layout="wide")
 
+# 👇 印刷時(Ctrl+P)に不要なエリアを消すための設定を追加しました
 st.markdown("""
     <style>
     @media print {
-        header, [data-testid="stSidebar"], [data-testid="stToolbar"], .stButton, .stDownloadButton, [data-testid="stExpander"] {
+        header, [data-testid="stSidebar"], [data-testid="stToolbar"], .stButton, .stDownloadButton, [data-testid="stExpander"],
+        [data-testid="stMultiSelect"], [data-testid="stCheckbox"], iframe, .no-print {
             display: none !important;
         }
         .main .block-container {
@@ -373,7 +375,8 @@ if st.session_state.generated:
     items = st.session_state.catalog_items
     filtered_items = items
     
-    st.write("### 🎯 リストの絞り込み")
+    # 👇 印刷時は非表示にするクラス(no-print)を各テキストに追加しました
+    st.markdown("<h3 class='no-print' style='margin-top: 1rem;'>🎯 リストの絞り込み</h3>", unsafe_allow_html=True)
     f_col1, f_col2 = st.columns(2)
     
     with f_col1:
@@ -385,7 +388,6 @@ if st.session_state.generated:
     with f_col2:
         is_new_only = st.toggle("✨ 新規入荷（#N/A, #REF!）のみを表示")
         if is_new_only:
-            # Pandas変換後の nan や None、空白も新規入荷とみなすように条件を拡張
             error_vals = ["#N/A", "#REF!", "NAN", "NONE", ""]
             filtered_items = [item for item in filtered_items if str(item["status"]).strip().upper() in error_vals]
         else:
@@ -394,13 +396,13 @@ if st.session_state.generated:
             if selected_status:
                 filtered_items = [item for item in filtered_items if item["status"] in selected_status]
     
-    st.write("---")
+    st.markdown("<hr class='no-print'>", unsafe_allow_html=True)
     
-    st.subheader("📱 スマホでカタログを見る")
+    st.markdown("<h3 class='no-print' style='margin-top: 1rem;'>📱 スマホでカタログを見る</h3>", unsafe_allow_html=True)
     col_dl, col_qr = st.columns([1, 1])
     
     with col_dl:
-        st.write("**方法1: ファイルとして保存して送る**")
+        st.markdown("<p class='no-print' style='font-weight: bold; margin-bottom: 0.5rem;'>方法1: ファイルとして保存して送る</p>", unsafe_allow_html=True)
         html_string = generate_html_report(filtered_items)
         st.download_button(
             label="『スマホ閲覧用Webページ』として保存", 
@@ -410,13 +412,13 @@ if st.session_state.generated:
             use_container_width=True,
             type="primary"
         )
-        st.caption("保存されたHTMLファイルを共有フォルダ等経由でスマホに送ります。")
+        st.markdown("<p class='no-print' style='font-size: 0.8rem; color: #666;'>保存されたHTMLファイルを共有フォルダ等経由でスマホに送ります。</p>", unsafe_allow_html=True)
             
     with col_qr:
-        st.write("**方法2: QRコードを読み取って直接繋ぐ**")
+        st.markdown("<p class='no-print' style='font-weight: bold; margin-bottom: 0.5rem;'>方法2: QRコードを読み取って直接繋ぐ</p>", unsafe_allow_html=True)
         local_ip = get_local_ip()
         app_url = f"http://{local_ip}:8501"
-        st.caption("※PCとスマホが同じ社内Wi-Fiに繋がっている必要があります。")
+        st.markdown("<p class='no-print' style='font-size: 0.8rem; color: #666;'>※PCとスマホが同じ社内Wi-Fiに繋がっている必要があります。</p>", unsafe_allow_html=True)
         
         qr_html = f"""
         <div style="display: flex; justify-content: left; align-items: center; background: transparent; padding: 5px;">
@@ -436,9 +438,9 @@ if st.session_state.generated:
         """
         import streamlit.components.v1 as components
         components.html(qr_html, height=180)
-        st.caption(f"スマホのカメラで読み取ってください")
+        st.markdown("<p class='no-print' style='font-size: 0.8rem; color: #666;'>スマホのカメラで読み取ってください</p>", unsafe_allow_html=True)
     
-    st.write("---")
+    st.markdown("<hr class='no-print'>", unsafe_allow_html=True)
 
     num_cols = 4 if is_print_mode else 3
     img_height = "180px" if is_print_mode else "300px"
