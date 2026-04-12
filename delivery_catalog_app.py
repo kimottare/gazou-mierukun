@@ -8,6 +8,8 @@ import os
 import concurrent.futures
 import datetime
 import socket 
+import zlib       # 追加：データを圧縮するため
+import base64     # 追加：データをURLに変換するため
 
 # --- 🌟 楽天アプリID ---
 RAKUTEN_APP_ID = "9fd3dd97-a071-4e2b-8579-dec02ea27217" 
@@ -92,15 +94,6 @@ def generate_html_report(items):
     </html>
     """
     return html_content
-
-def get_local_ip():
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
-    except: return "localhost"
 
 def is_valid_adidas_img(url):
     keywords = ["adidas", "yimg", "bing", "gstatic", "shop-adidas", "mm-adidas"]
@@ -193,18 +186,32 @@ def save_auto_save_data(items):
 # ==========================================
 st.title("📦 商品画像見える君")
 
+# 👇 追加：スマホでQRを読み込んだ時のデータ復元処理
 if "generated" not in st.session_state:
-    if os.path.exists(AUTO_SAVE_FILE):
+    st.session_state.catalog_items = []
+    st.session_state.generated = False
+
+    if "d" in st.query_params:
+        try:
+            # URLから圧縮されたデータを受け取り、解凍してリストに戻す
+            b64_str = st.query_params["d"]
+            compressed = base64.urlsafe_b64decode(b64_str.encode('utf-8'))
+            json_str = zlib.decompress(compressed).decode('utf-8')
+            loaded_items = json.loads(json_str)
+            
+            st.session_state.catalog_items = loaded_items
+            st.session_state.generated = True
+            st.success("✅ スマホへカタログの転送が完了しました！")
+        except Exception as e:
+            st.error("データの読み込みに失敗しました。")
+            
+    # 通常のオートセーブ読み込み
+    elif os.path.exists(AUTO_SAVE_FILE):
         try:
             with open(AUTO_SAVE_FILE, "r", encoding="utf-8") as f:
                 st.session_state.catalog_items = json.load(f)
                 st.session_state.generated = True
-        except:
-            st.session_state.catalog_items = []
-            st.session_state.generated = False
-    else:
-        st.session_state.catalog_items = []
-        st.session_state.generated = False
+        except: pass
 
 with st.sidebar:
     st.header("⚙️ 設定・管理")
@@ -237,6 +244,8 @@ with st.sidebar:
             st.session_state.generated = False
             st.session_state.catalog_items = []
             if os.path.exists(AUTO_SAVE_FILE): os.remove(AUTO_SAVE_FILE)
+            # URLパラメータもリセットする
+            st.query_params.clear()
             st.rerun()
 
 if not st.session_state.generated:
@@ -444,30 +453,42 @@ if st.session_state.generated:
         st.markdown("<p class='no-print' style='font-size: 0.8rem; color: #666;'>保存されたHTMLファイルを共有フォルダ等経由でスマホに送ります。</p>", unsafe_allow_html=True)
             
     with col_qr:
-        st.markdown("<p class='no-print' style='font-weight: bold; margin-bottom: 0.5rem;'>方法2: QRコードを読み取って直接繋ぐ</p>", unsafe_allow_html=True)
-        local_ip = get_local_ip()
-        app_url = f"http://{local_ip}:8501"
-        st.markdown("<p class='no-print' style='font-size: 0.8rem; color: #666;'>※PCとスマホが同じ社内Wi-Fiに繋がっている必要があります。</p>", unsafe_allow_html=True)
+        # 👇 変更：社内ネットワーク専用から、どこからでもアクセスできるURL圧縮QR方式に変更！
+        st.markdown("<p class='no-print' style='font-weight: bold; margin-bottom: 0.5rem;'>方法2: QRコードでスマホに転送する (Wi-Fi不要!)</p>", unsafe_allow_html=True)
         
-        qr_html = f"""
-        <div style="display: flex; justify-content: left; align-items: center; background: transparent; padding: 5px;">
-            <div id="qrcode" style="background: white; padding: 10px; border-radius: 8px; border: 1px solid #ddd; display: inline-block;"></div>
-        </div>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-        <script>
-            new QRCode(document.getElementById("qrcode"), {{
-                text: "{app_url}",
-                width: 140,
-                height: 140,
-                colorDark : "#000000",
-                colorLight : "#ffffff",
-                correctLevel : QRCode.CorrectLevel.L
-            }});
-        </script>
-        """
-        import streamlit.components.v1 as components
-        components.html(qr_html, height=180)
-        st.markdown("<p class='no-print' style='font-size: 0.8rem; color: #666;'>スマホのカメラで読み取ってください</p>", unsafe_allow_html=True)
+        try:
+            # データを圧縮してBase64化
+            json_str = json.dumps(filtered_items)
+            compressed = zlib.compress(json_str.encode('utf-8'))
+            b64_str = base64.urlsafe_b64encode(compressed).decode('utf-8')
+            
+            st.markdown("<p class='no-print' style='font-size: 0.8rem; color: #666;'>※4G/5G回線でもOK！iPhoneの標準カメラで読み取ってください。<br>（※一度に転送する件数が多いとQRが細かくなり読み取れない場合があります）</p>", unsafe_allow_html=True)
+            
+            qr_html = f"""
+            <div style="display: flex; justify-content: left; align-items: center; background: transparent; padding: 5px;">
+                <div id="qrcode" style="background: white; padding: 10px; border-radius: 8px; border: 1px solid #ddd; display: inline-block;"></div>
+            </div>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+            <script>
+                // 現在のURL（クエリパラメータ抜き）を取得
+                var baseUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+                // 圧縮データをURLのお尻にくっつける
+                var fullUrl = baseUrl + "?d={b64_str}";
+                
+                new QRCode(document.getElementById("qrcode"), {{
+                    text: fullUrl,
+                    width: 160,
+                    height: 160,
+                    colorDark : "#000000",
+                    colorLight : "#ffffff",
+                    correctLevel : QRCode.CorrectLevel.L
+                }});
+            </script>
+            """
+            import streamlit.components.v1 as components
+            components.html(qr_html, height=200)
+        except Exception as e:
+            st.error("QRコードの作成に失敗しました。")
     
     st.markdown("<hr class='no-print'>", unsafe_allow_html=True)
 
