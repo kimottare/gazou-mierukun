@@ -247,7 +247,6 @@ if "generated" not in st.session_state:
 with st.sidebar:
     st.header("⚙️ 設定・管理")
     concurrency = st.slider("⚡ 検索スピード", 1, 10, 3)
-    # 👇 文言をコンパクトに修正
     is_print_mode = st.toggle("コンパクトモード", value=False)
     
     if st.button("🖨️ カタログを印刷", use_container_width=True, type="primary"):
@@ -255,9 +254,12 @@ with st.sidebar:
 
     st.write("---")
     
-    # 👇 絞り込み機能をサイドバーに移動（バグ修正：モード切替でリセットされないようにするため）
+    # 👇 絞り込みセクション
     if st.session_state.generated:
         st.subheader("🎯 絞り込み")
+        
+        is_new_only = st.checkbox("✨ 新規入荷のみ", key="new_only_toggle")
+
         items = st.session_state.catalog_items
         unique_bs = sorted(list(set([i["bs"] for i in items if i.get("bs")])))
         
@@ -273,8 +275,6 @@ with st.sidebar:
             with st.container(height=200):
                 for b in unique_bs:
                     if st.checkbox(b, key=f"chk_{b}"): sel_bs.append(b)
-        
-        is_new_only = st.toggle("✨ 新規入荷のみ", key="new_only_toggle")
         
         st.write("---")
         if st.button("🗑️ リセット", type="secondary", use_container_width=True):
@@ -360,35 +360,30 @@ if st.session_state.generated:
     items = st.session_state.catalog_items
     filtered = items
     
-    # サイドバーの選択状態を反映
-    if 'bs_ms' in locals() or 'sel_bs' in locals(): # 前の変数が残っている場合のケア
-        pass 
-    
-    # 選択されたBSで絞り込み
     if sel_bs:
         filtered = [i for i in filtered if i["bs"] in sel_bs]
     
-    # 新規入荷のみ絞り込み
     if is_new_only:
         filtered = [i for i in filtered if str(i.get("status", "")).strip().upper() in ["#N/A", "#REF!", "NAN", ""]]
 
     # --- UI表示 ---
+    total_q = sum([float(i.get("qty",0)) if i.get("qty") else 0 for i in filtered])
+    
     if not is_print_mode:
-        total_q = sum([float(i.get("qty",0)) if i.get("qty") else 0 for i in filtered])
         st.info(f"📊 **{len(filtered)}** 品番 / 合計 **{int(total_q)}** 点 を表示中")
-        
-        st.markdown("<h3 class='no-print'>📱 スマホ転送・出力</h3>", unsafe_allow_html=True)
-        btn1, btn2 = st.columns(2)
-        with btn1:
-            st.download_button("HTMLファイルとして保存", generate_html_report(filtered), "catalog.html", "text/html", use_container_width=True, type="primary")
-        with btn2:
-            sid = st.session_state.get("share_id", uuid.uuid4().hex[:8]); st.session_state.share_id = sid
-            get_shared_store()[sid] = filtered
-            qr_html = f'<div style="display:flex; justify-content:center;"><div id="qrcode" style="background:white;padding:10px;border-radius:8px;"></div></div><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script><script>var url = window.parent.location.href.split("?")[0] + "?sid={sid}"; new QRCode(document.getElementById("qrcode"), {{text:url, width:120, height:120}});</script>'
-            components.html(qr_html, height=150)
     else:
-        total_q = sum([float(i.get("qty",0)) if i.get("qty") else 0 for i in filtered])
         st.caption(f"【コンパクトモード】 {len(filtered)} 品番 / {int(total_q)} 点")
+
+    # 👇 コンパクトモードでも常にQRコードとHTML保存を表示するように外出し
+    st.markdown("<h3 class='no-print'>📱 スマホ転送・出力</h3>", unsafe_allow_html=True)
+    btn1, btn2 = st.columns(2)
+    with btn1:
+        st.download_button("HTMLファイルとして保存", generate_html_report(filtered), "catalog.html", "text/html", use_container_width=True, type="primary")
+    with btn2:
+        sid = st.session_state.get("share_id", uuid.uuid4().hex[:8]); st.session_state.share_id = sid
+        get_shared_store()[sid] = filtered
+        qr_html = f'<div style="display:flex; justify-content:center;"><div id="qrcode" style="background:white;padding:10px;border-radius:8px;"></div></div><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script><script>var url = window.parent.location.href.split("?")[0] + "?sid={sid}"; new QRCode(document.getElementById("qrcode"), {{text:url, width:120, height:120}});</script>'
+        components.html(qr_html, height=150)
 
     # --- カタログ本体 ---
     num_cols = 5 if is_print_mode else 3
