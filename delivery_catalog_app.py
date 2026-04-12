@@ -22,60 +22,77 @@ def get_shared_store():
 st.set_page_config(page_title="商品画像見える君", layout="wide")
 
 # ==========================================
-# 🎨 最強の印刷・表示用CSS
+# 🎨 究極の視認性 & 高密度CSS
 # ==========================================
 st.markdown("""
     <style>
+    /* 1. タイトル周りの視認性向上 */
+    .main-title {
+        font-size: 2.2rem !important;
+        font-weight: 800 !important;
+        color: #1a1a1a !important;
+        margin-top: 2rem !important;
+        margin-bottom: 1.5rem !important;
+        text-align: left;
+        border-left: 8px solid #000;
+        padding-left: 15px;
+    }
+
+    /* 2. 商品カードの等高・整列（ズレ防止） */
+    div[data-testid="column"] {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        padding: 8px !important;
+    }
+    
+    .product-card-container {
+        min-height: 380px; /* カード全体の高さを統一 */
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* 品名・詳細の装飾 */
+    .product-title {
+        font-weight: 800;
+        font-size: 0.95rem;
+        line-height: 1.2;
+        height: 2.4em; /* 2行分確保してズレを防ぐ */
+        overflow: hidden;
+        margin-bottom: 4px;
+        color: #111;
+    }
+    .product-details {
+        font-size: 0.75rem;
+        color: #555;
+        line-height: 1.3;
+        height: 3.9em; /* 3行分確保 */
+        overflow: hidden;
+        margin-bottom: 8px;
+    }
+
+    /* 3. Streamlitパーツの隠蔽 */
     header {visibility: hidden;}
     footer {visibility: hidden;}
     [data-testid="stDecoration"] {display: none;}
     [data-testid="stHeader"] {display: none;}
 
-    /* 画面表示：カタログカードのスタイル */
-    .product-title {
-        font-weight: 800;
-        font-size: 1.1rem;
-        line-height: 1.2;
-        margin-bottom: 4px;
-        color: #1a1a1a;
-    }
-    .product-details {
-        font-size: 0.85rem;
-        color: #444;
-        line-height: 1.4;
-        margin-bottom: 8px;
-    }
-
-    /* 印刷時の設定 */
+    /* 4. 印刷時の最強設定 */
     @media print {
-        /* 不要な要素を完全に消去 */
         header, [data-testid="stSidebar"], [data-testid="stToolbar"], 
         .stButton, .stDownloadButton, [data-testid="stExpander"],
         [data-testid="stMultiSelect"], [data-testid="stCheckbox"], 
-        .no-print, .stTabs, iframe, .stTextInput, .stAlert, hr, .stMarkdown div[data-testid="stCaptionContainer"] {
+        .no-print, .stTabs, iframe, .stTextInput, .stAlert, hr {
             display: none !important;
         }
-
         .main .block-container {
             max-width: 100% !important;
             padding: 0 !important;
             margin: 0 !important;
         }
-
-        div[data-testid="column"] {
-            break-inside: avoid;
-            page-break-inside: avoid;
-            padding: 5px !important;
-        }
-
-        body {
-            background-color: white !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-        }
-        
-        /* 印刷時はURL入力欄などを消すための調整 */
-        .stTextInput { display: none !important; }
+        body { background-color: white !important; }
+        .product-title { font-size: 0.8rem; }
+        .product-details { font-size: 0.65rem; }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -85,29 +102,20 @@ st.markdown("""
 # ==========================================
 @st.dialog("データの全消去")
 def confirm_reset():
-    st.warning("現在表示されているリストと保存データをすべて削除します。よろしいですか？")
+    st.warning("現在表示されているリストと保存データをすべて削除します。")
     col1, col2 = st.columns(2)
-    if col1.button("はい、削除します", type="primary", use_container_width=True):
+    if col1.button("はい、削除", type="primary", use_container_width=True):
         st.session_state.generated = False
         st.session_state.catalog_items = []
         if os.path.exists(AUTO_SAVE_FILE): os.remove(AUTO_SAVE_FILE)
         st.query_params.clear()
         st.rerun()
-    if col2.button("いいえ、戻ります", use_container_width=True):
+    if col2.button("キャンセル", use_container_width=True):
         st.rerun()
 
 # ==========================================
-# ヘルパー関数群
+# ロジック・ヘルパー
 # ==========================================
-def generate_html_report(items):
-    now_str = datetime.datetime.now().strftime("%Y年%m月%d日 %H:%M")
-    html_content = f"""<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>商品カタログ</title><style>body {{ font-family: sans-serif; padding: 20px; }} .grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; }} .card {{ border: 1px solid #ddd; padding: 12px; border-radius: 8px; break-inside: avoid; }} .img-box {{ height: 180px; display: flex; justify-content: center; align-items: center; margin-bottom: 8px; }} img {{ max-height: 100%; max-width: 100%; object-fit: contain; }} .title {{ font-weight: bold; font-size: 1rem; margin-bottom: 4px; }} .details {{ font-size: 0.8rem; color: #333; line-height: 1.4; }}</style></head><body><h1>📦 商品カタログ ({len(items)}件)</h1><div class="grid">"""
-    for item in items:
-        url = item.get("manual_url") or item.get("auto_url") or ""
-        html_content += f'<div class="card"><div class="img-box"><img src="{url}"></div><div class="title">{item.get("name","")}</div><div class="details">{item.get("code","")} / {item.get("size","")} / {item.get("qty","")}点 / {item.get("status","")}</div></div>'
-    html_content += f"</div><p style='text-align:center; font-size:0.7rem; margin-top:30px;'>作成日時: {now_str}</p></body></html>"
-    return html_content
-
 def is_valid_adidas_img(url):
     keywords = ["adidas", "yimg", "bing", "gstatic", "shop-adidas", "mm-adidas"]
     return any(k in url.lower() for k in keywords)
@@ -164,9 +172,9 @@ def save_auto_save_data(items):
     except: pass 
 
 # ==========================================
-# メイン UI
+# メイン UI 
 # ==========================================
-st.title("📦 商品画像見える君")
+st.markdown('<div class="main-title">📦 商品画像見える君</div>', unsafe_allow_html=True)
 
 if "generated" not in st.session_state:
     st.session_state.catalog_items = []
@@ -187,18 +195,18 @@ if "generated" not in st.session_state:
         except: pass
 
 with st.sidebar:
-    st.header("⚙️ 設定・管理")
-    concurrency = st.slider("⚡ 画像取得スピード", 1, 10, 3)
-    is_print_mode = st.toggle("印刷用コンパクト表示モード", value=False)
+    st.header("⚙️ 管理パネル")
+    concurrency = st.slider("⚡ 検索スピード", 1, 10, 3)
+    is_print_mode = st.toggle("高密度・印刷モード (5列)", value=False)
     
-    if st.button("🖨️ 今すぐ印刷する", use_container_width=True, type="primary"):
+    if st.button("🖨️ カタログを印刷", use_container_width=True, type="primary"):
         components.html("<script>window.parent.print();</script>", height=0)
 
     st.write("---")
     if st.session_state.generated:
         json_string = json.dumps(st.session_state.catalog_items, ensure_ascii=False, indent=2)
-        st.download_button("データを保存 (.json)", json_string, "catalog_backup.json", "application/json", use_container_width=True)
-        if st.button("🗑️ リセット", type="secondary", use_container_width=True):
+        st.download_button("データを保存", json_string, "catalog.json", "application/json", use_container_width=True)
+        if st.button("🗑️ 全消去", type="secondary", use_container_width=True):
             confirm_reset()
 
 if not st.session_state.generated:
@@ -222,19 +230,19 @@ if not st.session_state.generated:
             columns = [str(c).strip() if str(c).strip() and str(c).lower() != 'nan' else f"列{i+1}" for i, c in enumerate(df.columns)]
             df.columns = columns
 
-            with st.expander("📋 読み込む列の割り当て"):
+            with st.expander("📋 列の自動割り当て確認"):
                 c1, c2, c3 = st.columns(3)
                 with c1:
-                    code_col = st.selectbox("Articleの列", columns, index=guess_column_index(columns, ['artno', 'article', 'art', 'code']))
-                    size_col = st.selectbox("サイズの列", ["(なし)"] + columns, index=guess_column_index(columns, ['size', 'サイズ'])+1)
+                    code_col = st.selectbox("Article", columns, index=guess_column_index(columns, ['artno', 'article', 'art', 'code']))
+                    size_col = st.selectbox("Size", ["(なし)"] + columns, index=guess_column_index(columns, ['size', 'サイズ'])+1)
                 with c2:
-                    name_col = st.selectbox("Nameの列", columns, index=guess_column_index(columns, ['商品名称', '名称', 'name', 'item']))
-                    qty_col = st.selectbox("数量の列", ["(なし)"] + columns, index=guess_column_index(columns, ['qty', '数量'])+1)
+                    name_col = st.selectbox("Name", columns, index=guess_column_index(columns, ['商品名称', '名称', 'name', 'item']))
+                    qty_col = st.selectbox("Qty", ["(なし)"] + columns, index=guess_column_index(columns, ['qty', '数量'])+1)
                 with c3:
-                    bs_col = st.selectbox("BSの列", ["(なし)"] + columns, index=guess_column_index(columns, ['bs', 'category'])+1)
-                    status_col = st.selectbox("Statusの列", ["(なし)"] + columns, index=len(columns))
+                    bs_col = st.selectbox("BS", ["(なし)"] + columns, index=guess_column_index(columns, ['bs', 'category'])+1)
+                    status_col = st.selectbox("Status", ["(なし)"] + columns, index=len(columns))
 
-            if st.button("作成", type="primary", use_container_width=True):
+            if st.button("カタログ作成開始", type="primary", use_container_width=True):
                 display_df = df[df[code_col].astype(str).str.strip() != ""]
                 agg_sizes, agg_qtys = {}, {}
                 for code, group in display_df.groupby(code_col):
@@ -247,8 +255,6 @@ if not st.session_state.generated:
                         except: q_num = 0
                         total_qty += q_num
                         if s_val: size_dict[s_val] = size_dict.get(s_val, 0) + q_num
-                    
-                    # 写真通りのサイズ内訳文字列を生成
                     size_list = [f"{s}({int(q) if q==int(q) else q})" for s, q in size_dict.items()]
                     agg_sizes[code_str] = ", ".join(size_list)
                     agg_qtys[code_str] = str(int(total_qty) if total_qty == int(total_qty) else total_qty)
@@ -284,7 +290,6 @@ if st.session_state.generated:
     items = st.session_state.catalog_items
     filtered = items
     
-    # 印刷モード時は作業用UIを隠す
     if not is_print_mode:
         st.markdown("<h3 class='no-print'>🎯 絞り込み</h3>", unsafe_allow_html=True)
         c1, c2 = st.columns(2)
@@ -293,8 +298,8 @@ if st.session_state.generated:
             def set_all_bs(state):
                 for b in unique_bs: st.session_state[f"chk_{b}"] = state
             bc1, bc2 = st.columns(2)
-            bc1.button("全て選択", use_container_width=True, on_click=set_all_bs, args=(True,))
-            bc2.button("全て解除", use_container_width=True, on_click=set_all_bs, args=(False,))
+            bc1.button("全て選択", on_click=set_all_bs, args=(True,), use_container_width=True)
+            bc2.button("全て解除", on_click=set_all_bs, args=(False,), use_container_width=True)
             sel_bs = []
             if unique_bs:
                 with st.container(height=150):
@@ -303,41 +308,39 @@ if st.session_state.generated:
             if sel_bs: filtered = [i for i in filtered if i["bs"] in sel_bs]
         with c2:
             if st.toggle("✨ 新規入荷のみ"):
-                filtered = [i for i in filtered if str(i.get("status", "")).strip().upper() in ["#N/A", "#REF!", "NAN", "NONE", ""]]
+                filtered = [i for i in filtered if str(i.get("status", "")).strip().upper() in ["#N/A", "#REF!", "NAN", ""]]
 
         total_q = sum([float(i.get("qty",0)) if i.get("qty") else 0 for i in filtered])
-        st.info(f"📦 表示: **{len(filtered)}** 品番 / 合計: **{int(total_q)}** 点")
+        st.info(f"📊 **{len(filtered)}** 品番 / 合計 **{int(total_q)}** 点 を表示中")
         
-        st.markdown("<h3 class='no-print'>📱 スマホ転送</h3>", unsafe_allow_html=True)
-        cdl, cqr = st.columns(2)
-        with cdl: st.download_button("HTML保存", generate_html_report(filtered), "catalog.html", "text/html", use_container_width=True)
-        with cqr:
-            sid = st.session_state.get("share_id", uuid.uuid4().hex[:8]); st.session_state.share_id = sid
-            get_shared_store()[sid] = filtered
-            qr_html = f'<div style="display:flex; justify-content:center;"><div id="qrcode" style="background:white;padding:10px;border-radius:8px;"></div></div><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script><script>var url = window.parent.location.href.split("?")[0] + "?sid={sid}"; new QRCode(document.getElementById("qrcode"), {{text:url, width:128, height:128}});</script>'
-            components.html(qr_html, height=160)
+        st.markdown("<h3 class='no-print'>📱 スマホへ転送</h3>", unsafe_allow_html=True)
+        sid = st.session_state.get("share_id", uuid.uuid4().hex[:8]); st.session_state.share_id = sid
+        get_shared_store()[sid] = filtered
+        qr_html = f'<div style="display:flex; justify-content:center;"><div id="qrcode" style="background:white;padding:10px;border-radius:8px;"></div></div><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script><script>var url = window.parent.location.href.split("?")[0] + "?sid={sid}"; new QRCode(document.getElementById("qrcode"), {{text:url, width:128, height:128}});</script>'
+        components.html(qr_html, height=160)
     else:
         total_q = sum([float(i.get("qty",0)) if i.get("qty") else 0 for i in filtered])
-        st.caption(f"カタログ出力中: {len(filtered)} 品番 / {int(total_q)} 点")
+        st.caption(f"【高密度モード】 {len(filtered)} 品番 / {int(total_q)} 点")
 
-    # --- 商品リスト表示 ---
-    num_cols = 4 if is_print_mode else 3
-    img_h = "160px" if is_print_mode else "280px"
+    # --- カタログ本体（5列対応） ---
+    num_cols = 5 if is_print_mode else 3
+    img_h = "140px" if is_print_mode else "260px"
+    
     for i in range(0, len(filtered), num_cols):
         cols = st.columns(num_cols) 
         for j, item in enumerate(filtered[i:i+num_cols]):
             with cols[j]:
-                # 品名・詳細（ここを写真 通りに強化）
+                # 商品情報
                 st.markdown(f'<div class="product-title">{item["name"]}</div>', unsafe_allow_html=True)
-                detail_str = f"{item['code']} / {item['size']} / {item.get('qty','0')}点 / {item['status']}"
+                detail_str = f"Art: {item['code']}<br>Size: {item['size']}<br>Qty: {item.get('qty','0')}点 / {item['status']}"
                 st.markdown(f'<div class="product-details">{detail_str}</div>', unsafe_allow_html=True)
                 
-                # 画像表示
+                # 画像
                 url = item.get("manual_url") or item.get("auto_url")
                 if url: st.markdown(f'<div style="height:{img_h};display:flex;justify-content:center;background:#fff;border-radius:6px;border:1px solid #eee;overflow:hidden;margin-bottom:8px;"><img src="{url}" style="max-height:100%;max-width:100%;object-fit:contain;"></div>', unsafe_allow_html=True)
                 else: st.markdown(f'<div style="height:{img_h};display:flex;justify-content:center;align-items:center;background:#f8f9fa;border-radius:6px;border:1px solid #ddd;color:#999;margin-bottom:8px;">画像なし</div>', unsafe_allow_html=True)
                 
-                # 作業用UI（印刷・コンパクトモード時は非表示）
+                # 作業UI（高密度モード時は隠す）
                 if not is_print_mode:
                     st.markdown(f"🔍 [Google検索](https://www.google.com/search?tbm=isch&q=adidas+{item['code']})")
                     new_u = st.text_input("URL貼り付け", value=item.get("manual_url", ""), key=f"inp_{item['code']}")
@@ -345,5 +348,4 @@ if st.session_state.generated:
                         item["manual_url"] = new_u
                         save_auto_save_data(items)
                         st.rerun()
-                    if item.get('source'): st.caption(f"元:{item['source']}")
                     st.write("---")
