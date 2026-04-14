@@ -19,7 +19,7 @@ AUTO_SAVE_FILE = "auto_save_catalog.json"
 def get_shared_store():
     return {}
 
-st.set_page_config(page_title="商品画像見える君", layout="wide")
+st.set_page_config(page_title="商品画像見えるくん", layout="wide")
 
 # ==========================================
 # 🎨 究極の視認性・スマホ1列リスト強制 ＋ 画像拡大機能
@@ -90,7 +90,7 @@ st.markdown("""
         font-size: 0.75rem;
         color: #e0e0e0 !important;
         line-height: 1.3;
-        height: 4.8em; /* 行数増加に合わせて少し広げる */
+        height: 4.8em; 
         overflow: hidden;
         margin-bottom: 8px;
         text-shadow: 1px 1px 3px rgba(0,0,0,1.0);
@@ -242,7 +242,6 @@ def generate_html_report(items):
     html_content = f"""<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>カタログ出力</title><style>body{{font-family:sans-serif;background:#fff;padding:20px;}} .grid{{display:grid;grid-template-columns:repeat(5, 1fr);gap:10px;}} .card{{border:1px solid #eee;padding:10px;border-radius:5px;break-inside:avoid;}} .img-box{{height:150px;display:flex;justify-content:center;align-items:center;}} img{{max-height:100%;max-width:100%;object-fit:contain;}} .t{{font-weight:bold;font-size:0.8rem;margin:5px 0;}} .d{{font-size:0.65rem;color:#666;}}</style></head><body><h3>📦 商品カタログ ({len(items)}件)</h3><div class="grid">"""
     for item in items:
         u = item.get("manual_url") or item.get("auto_url") or ""
-        # モードに応じたテキスト表示
         if item.get("mode") == "MKD":
             details_html = f'Art:{item["code"]}<br>Price:{item.get("price","")}<br>Gender:{item.get("gender","")}<br>Date:{item.get("date","")}<br>Qty:{item.get("qty","0")}'
         else:
@@ -313,7 +312,7 @@ def save_auto_save_data(items):
 # ==========================================
 # メイン UI 
 # ==========================================
-st.markdown('<div class="main-title">📦 商品画像見える君</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-title">📦 商品画像見えるくん</div>', unsafe_allow_html=True)
 
 if "generated" not in st.session_state:
     st.session_state.catalog_items = []
@@ -335,8 +334,8 @@ if "generated" not in st.session_state:
 with st.sidebar:
     st.header("⚙️ 設定・管理")
     
-    # 🌟 モード切替の追加
-    list_mode = st.radio("📋 リストモード", ["標準モード", "MKDリスト"], index=0)
+    # 🌟 モード切替の表記を変更
+    list_mode = st.radio("📋 リストモード", ["入荷リスト", "MKDリスト"], index=0)
     st.write("---")
     
     concurrency = st.slider("⚡ 検索スピード", 1, 10, 5)
@@ -349,7 +348,8 @@ with st.sidebar:
     
     if st.session_state.generated:
         st.subheader("🎯 絞り込み")
-        is_new_only = st.checkbox("✨ 新規入荷のみ (標準モード用)", key="new_only_toggle")
+        # 🌟 チェックボックスの表記を変更
+        is_new_only = st.checkbox("✨ 新規入荷のみ (入荷リスト用)", key="new_only_toggle")
 
         items = st.session_state.catalog_items
         unique_bs = sorted(list(set([i["bs"] for i in items if i.get("bs")])))
@@ -378,7 +378,7 @@ if not st.session_state.generated:
     if uploaded_file:
         try:
             # 🌟 モードによる読み込み処理の分岐
-            if list_mode == "標準モード":
+            if list_mode == "入荷リスト":
                 if uploaded_file.name.endswith('.csv'):
                     try: df = pd.read_csv(uploaded_file, na_filter=False, dtype=str, header=None, encoding='utf-8')
                     except: df = pd.read_csv(uploaded_file, na_filter=False, dtype=str, header=None, encoding='cp932')
@@ -412,7 +412,6 @@ if not st.session_state.generated:
                         status_col = st.selectbox("Status", ["(なし)"] + columns, index=guess_column_index(columns, ['inv qty', 'status', 'ステータス'], default_idx=len(columns)-1)+1)
 
             elif list_mode == "MKDリスト":
-                # 🌟 MKDモード: 1〜4行目を無視し、5行目(header=4)を列名とする
                 if uploaded_file.name.endswith('.csv'):
                     try: df = pd.read_csv(uploaded_file, na_filter=False, dtype=str, header=4, encoding='utf-8')
                     except: df = pd.read_csv(uploaded_file, na_filter=False, dtype=str, header=4, encoding='cp932')
@@ -441,7 +440,8 @@ if not st.session_state.generated:
             if st.button("カタログ作成開始", type="primary", use_container_width=True):
                 display_df = df[df[code_col].astype(str).str.strip() != ""]
                 
-                if list_mode == "標準モード":
+                # 🌟 モードによるデータ処理の分岐
+                if list_mode == "入荷リスト":
                     agg_sizes, agg_qtys = {}, {}
                     for code, group in display_df.groupby(code_col):
                         code_str = str(code).strip()
@@ -464,7 +464,7 @@ if not st.session_state.generated:
                         code, name = str(row[code_col]).strip(), str(row[name_col]).strip()
                         if not code or code.lower() in ['nan', 'none']: return idx, None
                         img = get_best_image(code, name)
-                        return idx, {"mode": "標準", "code": code, "name": name, "bs": str(row[bs_col]) if bs_col != "(なし)" else "",
+                        return idx, {"mode": "入荷", "code": code, "name": name, "bs": str(row[bs_col]) if bs_col != "(なし)" else "",
                                    "size": agg_sizes.get(code, ""), "qty": agg_qtys.get(code, ""),
                                    "status": str(row[status_col]) if status_col != "(なし)" else "",
                                    "auto_url": img["url"] if img else None, "source": img["source"] if img else None, "manual_url": ""}
@@ -489,7 +489,6 @@ if not st.session_state.generated:
                         idx, row = args
                         code, name = str(row[code_col]).strip(), str(row[name_col]).strip()
                         if not code or code.lower() in ['nan', 'none']: return idx, None
-                        # リストのImage列は一切見ず、画像検索を実行
                         img = get_best_image(code, name)
                         return idx, {"mode": "MKD", "code": code, "name": name, "bs": str(row[bs_col]) if bs_col != "(なし)" else "",
                                    "price": str(row[price_col]), "gender": str(row[gender_col]), "date": str(row[date_col]),
