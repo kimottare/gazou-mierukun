@@ -22,7 +22,7 @@ def get_shared_store():
 st.set_page_config(page_title="商品画像見える君", layout="wide")
 
 # ==========================================
-# 🎨 究極の視認性・コンパクト・モバイル2列絶対強制CSS
+# 🎨 究極の視認性・モバイル2列・フローティングボタンCSS
 # ==========================================
 st.markdown("""
     <style>
@@ -64,7 +64,6 @@ st.markdown("""
         box-shadow: 0 4px 10px rgba(0,0,0,0.6);
     }
 
-    /* 画像をハッキリ表示 */
     .product-image-container img {
         max-height: 100%;
         max-width: 100%;
@@ -83,27 +82,40 @@ st.markdown("""
         text-shadow: 1px 1px 3px rgba(0,0,0,1.0);
     }
 
-    /* 🌟 UIの修正ポイント：黒い帯を消し、ボタンだけを救出する */
+    /* ==========================================
+       🌟 佐藤さんのアイデア：UIの抜本的改善
+       ========================================== */
     footer {visibility: hidden;}
     [data-testid="stDecoration"] {display: none;}
     
-    /* 黒い帯（ヘッダー全体）の背景を完全に透明にする */
-    [data-testid="stHeader"] {
+    /* 黒い帯（ヘッダー全体）の背景を完全に透明化（無力化） */
+    header[data-testid="stHeader"] {
         background-color: transparent !important;
+        box-shadow: none !important;
     }
     
-    /* 右上の余計なメニュー（Share等）を非表示にする */
+    /* 右上の余計なメニューを完全排除 */
     [data-testid="stToolbar"] { 
         display: none !important; 
     }
     
-    /* 閉じた状態のサイドバーを開くボタン（ハンバーガー）を強制的に表示・装飾 */
-    [data-testid="collapsedControl"] {
-        visibility: visible !important;
+    /* ボタンだけを切り離し、左上に目立つように浮かせる（フローティング化） */
+    [data-testid="collapsedControl"], 
+    header[data-testid="stHeader"] button {
+        position: fixed !important;
+        top: 15px !important;
+        left: 15px !important;
+        background-color: #3b82f6 !important; /* 視認性の高いブルー */
         color: #ffffff !important;
-        background-color: rgba(255,255,255,0.15) !important;
-        border-radius: 8px !important;
+        border-radius: 50% !important; /* 丸いボタンに */
+        width: 48px !important;
+        height: 48px !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
         z-index: 999999 !important; /* 確実に最前面へ */
+        box-shadow: 0 4px 12px rgba(0,0,0,0.6) !important;
+        border: 2px solid rgba(255,255,255,0.8) !important;
     }
 
     /* ==========================================
@@ -117,7 +129,7 @@ st.markdown("""
             margin-top: 1rem !important;
         }
 
-        /* 1カラム化（縦並び）を完全に阻止し、横2列を死守する */
+        /* 1カラム化を完全に阻止し、横2列を死守する */
         div[data-testid="stHorizontalBlock"] {
             display: flex !important;
             flex-direction: row !important;
@@ -126,7 +138,7 @@ st.markdown("""
             gap: 0 !important;
         }
 
-        /* 各カラム要素を確実に50%幅で固定する（100%への拡大を阻止） */
+        /* 各カラム要素を確実に50%幅で固定する */
         div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
             width: 50% !important;
             flex: 0 0 50% !important;
@@ -147,7 +159,7 @@ st.markdown("""
         }
         
         .product-image-container {
-            height: 150px !important; /* スマホ2列時に適切なアスペクト比を維持 */
+            height: 150px !important;
         }
     }
 
