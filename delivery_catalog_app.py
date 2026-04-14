@@ -22,7 +22,7 @@ def get_shared_store():
 st.set_page_config(page_title="商品画像見える君", layout="wide")
 
 # ==========================================
-# 🎨 究極の視認性・モバイル2列・フローティングボタンCSS
+# 🎨 究極の視認性・モバイル2列・安全なメニューボタンCSS
 # ==========================================
 st.markdown("""
     <style>
@@ -83,39 +83,25 @@ st.markdown("""
     }
 
     /* ==========================================
-       🌟 佐藤さんのアイデア：UIの抜本的改善
+       🌟 メニューボタン＆ヘッダーの安全な制御
        ========================================== */
     footer {visibility: hidden;}
     [data-testid="stDecoration"] {display: none;}
     
-    /* 黒い帯（ヘッダー全体）の背景を完全に透明化（無力化） */
-    header[data-testid="stHeader"] {
+    /* 黒い帯（ヘッダー全体）の背景を透明にして圧迫感を消す */
+    [data-testid="stHeader"] {
         background-color: transparent !important;
-        box-shadow: none !important;
     }
     
-    /* 右上の余計なメニューを完全排除 */
+    /* 右上の不要なメニュー（Share等）を完全に消す */
     [data-testid="stToolbar"] { 
         display: none !important; 
     }
     
-    /* ボタンだけを切り離し、左上に目立つように浮かせる（フローティング化） */
-    [data-testid="collapsedControl"], 
-    header[data-testid="stHeader"] button {
-        position: fixed !important;
-        top: 15px !important;
-        left: 15px !important;
-        background-color: #3b82f6 !important; /* 視認性の高いブルー */
-        color: #ffffff !important;
-        border-radius: 50% !important; /* 丸いボタンに */
-        width: 48px !important;
-        height: 48px !important;
-        display: flex !important;
-        justify-content: center !important;
-        align-items: center !important;
-        z-index: 999999 !important; /* 確実に最前面へ */
-        box-shadow: 0 4px 12px rgba(0,0,0,0.6) !important;
-        border: 2px solid rgba(255,255,255,0.8) !important;
+    /* 左上のメニュー開閉ボタン（ハンバーガー）だけをうっすら白くして確実に見えるようにする */
+    [data-testid="stHeader"] button {
+        background-color: rgba(255, 255, 255, 0.15) !important;
+        border-radius: 6px !important;
     }
 
     /* ==========================================
@@ -129,7 +115,6 @@ st.markdown("""
             margin-top: 1rem !important;
         }
 
-        /* 1カラム化を完全に阻止し、横2列を死守する */
         div[data-testid="stHorizontalBlock"] {
             display: flex !important;
             flex-direction: row !important;
@@ -138,7 +123,6 @@ st.markdown("""
             gap: 0 !important;
         }
 
-        /* 各カラム要素を確実に50%幅で固定する */
         div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
             width: 50% !important;
             flex: 0 0 50% !important;
