@@ -90,7 +90,7 @@ st.markdown("""
         font-size: 0.75rem;
         color: #e0e0e0 !important;
         line-height: 1.3;
-        height: 3.9em;
+        height: 4.8em; /* 行数増加に合わせて少し広げる */
         overflow: hidden;
         margin-bottom: 8px;
         text-shadow: 1px 1px 3px rgba(0,0,0,1.0);
@@ -168,9 +168,9 @@ st.markdown("""
         }
 
         .product-image-container {
-            width: 80px !important;
-            height: 80px !important; 
-            min-width: 80px;
+            width: 90px !important;
+            height: 90px !important; 
+            min-width: 90px;
             margin-bottom: 0 !important;
             margin-right: 15px;
             border-radius: 6px;
@@ -191,7 +191,7 @@ st.markdown("""
         }
 
         .product-details {
-            font-size: 0.75rem !important;
+            font-size: 0.70rem !important;
             height: auto !important;
             text-shadow: none !important;
             color: #bbb !important;
@@ -240,9 +240,15 @@ def confirm_reset():
 def generate_html_report(items):
     now_str = datetime.datetime.now().strftime("%Y年%m月%d日 %H:%M")
     html_content = f"""<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>カタログ出力</title><style>body{{font-family:sans-serif;background:#fff;padding:20px;}} .grid{{display:grid;grid-template-columns:repeat(5, 1fr);gap:10px;}} .card{{border:1px solid #eee;padding:10px;border-radius:5px;break-inside:avoid;}} .img-box{{height:150px;display:flex;justify-content:center;align-items:center;}} img{{max-height:100%;max-width:100%;object-fit:contain;}} .t{{font-weight:bold;font-size:0.8rem;margin:5px 0;}} .d{{font-size:0.65rem;color:#666;}}</style></head><body><h3>📦 商品カタログ ({len(items)}件)</h3><div class="grid">"""
-    for i in items:
-        u = i.get("manual_url") or i.get("auto_url") or ""
-        html_content += f'<div class="card"><div class="img-box"><img src="{u}"></div><div class="t">{i.get("name","")}</div><div class="d">Art:{i.get("code","")}<br>{i.get("size","")}<br>{i.get("qty","")}点 / {i.get("status","")}</div></div>'
+    for item in items:
+        u = item.get("manual_url") or item.get("auto_url") or ""
+        # モードに応じたテキスト表示
+        if item.get("mode") == "MKD":
+            details_html = f'Art:{item["code"]}<br>Price:{item.get("price","")}<br>Gender:{item.get("gender","")}<br>Date:{item.get("date","")}<br>Qty:{item.get("qty","0")}'
+        else:
+            details_html = f'Art:{item["code"]}<br>{item.get("size","")}<br>{item.get("qty","0")}点 / {item.get("status","")}'
+            
+        html_content += f'<div class="card"><div class="img-box"><img src="{u}"></div><div class="t">{item.get("name","")}</div><div class="d">{details_html}</div></div>'
     html_content += f"</div><p style='text-align:center;font-size:0.6rem;'>出力:{now_str}</p></body></html>"
     return html_content
 
@@ -328,6 +334,11 @@ if "generated" not in st.session_state:
 
 with st.sidebar:
     st.header("⚙️ 設定・管理")
+    
+    # 🌟 モード切替の追加
+    list_mode = st.radio("📋 リストモード", ["標準モード", "MKDリスト"], index=0)
+    st.write("---")
+    
     concurrency = st.slider("⚡ 検索スピード", 1, 10, 5)
     is_print_mode = st.toggle("コンパクトモード", value=False)
     
@@ -338,8 +349,7 @@ with st.sidebar:
     
     if st.session_state.generated:
         st.subheader("🎯 絞り込み")
-        
-        is_new_only = st.checkbox("✨ 新規入荷のみ", key="new_only_toggle")
+        is_new_only = st.checkbox("✨ 新規入荷のみ (標準モード用)", key="new_only_toggle")
 
         items = st.session_state.catalog_items
         unique_bs = sorted(list(set([i["bs"] for i in items if i.get("bs")])))
@@ -362,75 +372,130 @@ with st.sidebar:
             confirm_reset()
 
 if not st.session_state.generated:
-    st.subheader("📝 新規リストを作成")
+    st.subheader(f"📝 新規リストを作成 ({list_mode})")
     uploaded_file = st.file_uploader("Excel/CSVをアップロード", type=['xlsx', 'xlsm', 'csv'])
+    
     if uploaded_file:
         try:
-            if uploaded_file.name.endswith('.csv'):
-                try: df = pd.read_csv(uploaded_file, na_filter=False, dtype=str, header=None, encoding='utf-8')
-                except: df = pd.read_csv(uploaded_file, na_filter=False, dtype=str, header=None, encoding='cp932')
-            else:
-                xl = pd.ExcelFile(uploaded_file)
-                sheet_names = xl.sheet_names
-                if len(sheet_names) > 1:
-                    selected_sheet = st.selectbox("読み込むシートを選択", sheet_names)
+            # 🌟 モードによる読み込み処理の分岐
+            if list_mode == "標準モード":
+                if uploaded_file.name.endswith('.csv'):
+                    try: df = pd.read_csv(uploaded_file, na_filter=False, dtype=str, header=None, encoding='utf-8')
+                    except: df = pd.read_csv(uploaded_file, na_filter=False, dtype=str, header=None, encoding='cp932')
                 else:
-                    selected_sheet = sheet_names[0]
-                df = pd.read_excel(uploaded_file, sheet_name=selected_sheet, na_filter=False, dtype=str, header=None)
-            
-            header_idx = 0
-            for i, row in df.iterrows():
-                row_vals = [str(v) for v in row if v is not None]
-                if sum(1 for v in row_vals if v.strip() != "" and v.lower() != "nan") >= 3:
-                    header_idx = i
-                    break
-            df.columns = df.iloc[header_idx].tolist()
-            df = df.iloc[header_idx+1:].reset_index(drop=True)
-            columns = [str(c).strip() if str(c).strip() and str(c).lower() != 'nan' else f"列{i+1}" for i, c in enumerate(df.columns)]
-            df.columns = columns
+                    xl = pd.ExcelFile(uploaded_file)
+                    sheet_names = xl.sheet_names
+                    selected_sheet = st.selectbox("読み込むシートを選択", sheet_names) if len(sheet_names) > 1 else sheet_names[0]
+                    df = pd.read_excel(uploaded_file, sheet_name=selected_sheet, na_filter=False, dtype=str, header=None)
+                
+                header_idx = 0
+                for i, row in df.iterrows():
+                    row_vals = [str(v) for v in row if v is not None]
+                    if sum(1 for v in row_vals if v.strip() != "" and v.lower() != "nan") >= 3:
+                        header_idx = i
+                        break
+                df.columns = df.iloc[header_idx].tolist()
+                df = df.iloc[header_idx+1:].reset_index(drop=True)
+                columns = [str(c).strip() if str(c).strip() and str(c).lower() != 'nan' else f"列{i+1}" for i, c in enumerate(df.columns)]
+                df.columns = columns
+                
+                with st.expander("📋 列割り当て確認", expanded=True):
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        code_col = st.selectbox("Article", columns, index=guess_column_index(columns, ['material number', 'artno', 'article', 'art', 'code', '品番']))
+                        size_col = st.selectbox("Size", ["(なし)"] + columns, index=guess_column_index(columns, ['size description', 'size', 'サイズ'])+1)
+                    with c2:
+                        name_col = st.selectbox("Name", columns, index=guess_column_index(columns, ['商品名称', '名称', 'name', 'item', 'description'], exclude=['size', 'サイズ', '店舗', 'store']))
+                        qty_col = st.selectbox("Qty", ["(なし)"] + columns, index=guess_column_index(columns, ['qty', '数量'], exclude=['inv qty'])+1)
+                    with c3:
+                        bs_col = st.selectbox("BS", ["(なし)"] + columns, index=guess_column_index(columns, ['bs', 'category'], exclude=['size', 'サイズ'])+1)
+                        status_col = st.selectbox("Status", ["(なし)"] + columns, index=guess_column_index(columns, ['inv qty', 'status', 'ステータス'], default_idx=len(columns)-1)+1)
 
-            with st.expander("📋 列割り当て確認", expanded=True):
-                c1, c2, c3 = st.columns(3)
-                with c1:
-                    code_col = st.selectbox("Article", columns, index=guess_column_index(columns, ['material number', 'artno', 'article', 'art', 'code', '品番']))
-                    size_col = st.selectbox("Size", ["(なし)"] + columns, index=guess_column_index(columns, ['size description', 'size', 'サイズ'])+1)
-                with c2:
-                    name_col = st.selectbox("Name", columns, index=guess_column_index(columns, ['商品名称', '名称', 'name', 'item', 'description'], exclude=['size', 'サイズ', '店舗', 'store']))
-                    qty_col = st.selectbox("Qty", ["(なし)"] + columns, index=guess_column_index(columns, ['qty', '数量'], exclude=['inv qty'])+1)
-                with c3:
-                    bs_col = st.selectbox("BS", ["(なし)"] + columns, index=guess_column_index(columns, ['bs', 'category'], exclude=['size', 'サイズ'])+1)
-                    status_col = st.selectbox("Status", ["(なし)"] + columns, index=guess_column_index(columns, ['inv qty', 'status', 'ステータス'], default_idx=len(columns)-1)+1)
+            elif list_mode == "MKDリスト":
+                # 🌟 MKDモード: 1〜4行目を無視し、5行目(header=4)を列名とする
+                if uploaded_file.name.endswith('.csv'):
+                    try: df = pd.read_csv(uploaded_file, na_filter=False, dtype=str, header=4, encoding='utf-8')
+                    except: df = pd.read_csv(uploaded_file, na_filter=False, dtype=str, header=4, encoding='cp932')
+                else:
+                    xl = pd.ExcelFile(uploaded_file)
+                    sheet_names = xl.sheet_names
+                    selected_sheet = st.selectbox("読み込むシートを選択", sheet_names) if len(sheet_names) > 1 else sheet_names[0]
+                    df = pd.read_excel(uploaded_file, sheet_name=selected_sheet, na_filter=False, dtype=str, header=4)
+                
+                columns = [str(c).strip() for c in df.columns]
+                df.columns = columns
+                
+                with st.expander("📋 列割り当て確認 (MKD)", expanded=True):
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        code_col = st.selectbox("商品番号", columns, index=guess_column_index(columns, ['material number', 'code', 'art']))
+                        name_col = st.selectbox("商品名", columns, index=guess_column_index(columns, ['model name', 'name']))
+                    with c2:
+                        price_col = st.selectbox("NEW Price tax", columns, index=guess_column_index(columns, ['new price tax', 'price']))
+                        gender_col = st.selectbox("ジェンダー", columns, index=guess_column_index(columns, ['gender']))
+                    with c3:
+                        qty_col = st.selectbox("数量", columns, index=guess_column_index(columns, ['inv qty', 'qty']))
+                        date_col = st.selectbox("MKD/MKU Start Date", columns, index=guess_column_index(columns, ['mkd/mku start date', 'date']))
+                        bs_col = st.selectbox("カテゴリー (絞り込み用)", ["(なし)"] + columns, index=guess_column_index(columns, ['business segment', 'bs'])+1)
 
             if st.button("カタログ作成開始", type="primary", use_container_width=True):
                 display_df = df[df[code_col].astype(str).str.strip() != ""]
                 
-                agg_sizes, agg_qtys = {}, {}
-                for code, group in display_df.groupby(code_col):
-                    code_str = str(code).strip()
-                    size_dict, total_qty = {}, 0
-                    for _, row in group.iterrows():
-                        s_val, q_val = str(row[size_col]).strip() if size_col != "(なし)" else "", str(row[qty_col]).strip() if qty_col != "(なし)" else "0"
-                        try: q_num = float(q_val)
-                        except: q_num = 0
-                        total_qty += q_num
-                        if s_val: size_dict[s_val] = size_dict.get(s_val, 0) + q_num
-                    agg_sizes[code_str] = ", ".join([f"{s}({int(q) if q==int(q) else q})" for s, q in size_dict.items()])
-                    agg_qtys[code_str] = str(int(total_qty) if total_qty == int(total_qty) else total_qty)
+                if list_mode == "標準モード":
+                    agg_sizes, agg_qtys = {}, {}
+                    for code, group in display_df.groupby(code_col):
+                        code_str = str(code).strip()
+                        size_dict, total_qty = {}, 0
+                        for _, row in group.iterrows():
+                            s_val, q_val = str(row[size_col]).strip() if size_col != "(なし)" else "", str(row[qty_col]).strip() if qty_col != "(なし)" else "0"
+                            try: q_num = float(q_val)
+                            except: q_num = 0
+                            total_qty += q_num
+                            if s_val: size_dict[s_val] = size_dict.get(s_val, 0) + q_num
+                        agg_sizes[code_str] = ", ".join([f"{s}({int(q) if q==int(q) else q})" for s, q in size_dict.items()])
+                        agg_qtys[code_str] = str(int(total_qty) if total_qty == int(total_qty) else total_qty)
 
-                display_df = display_df.drop_duplicates(subset=[code_col])
-                st.info(f"自動検索中... ({len(display_df)}件)")
-                p_bar = st.progress(0)
+                    display_df = display_df.drop_duplicates(subset=[code_col])
+                    st.info(f"自動検索中... ({len(display_df)}件)")
+                    p_bar = st.progress(0)
+                    
+                    def fetch_data(args):
+                        idx, row = args
+                        code, name = str(row[code_col]).strip(), str(row[name_col]).strip()
+                        if not code or code.lower() in ['nan', 'none']: return idx, None
+                        img = get_best_image(code, name)
+                        return idx, {"mode": "標準", "code": code, "name": name, "bs": str(row[bs_col]) if bs_col != "(なし)" else "",
+                                   "size": agg_sizes.get(code, ""), "qty": agg_qtys.get(code, ""),
+                                   "status": str(row[status_col]) if status_col != "(なし)" else "",
+                                   "auto_url": img["url"] if img else None, "source": img["source"] if img else None, "manual_url": ""}
                 
-                def fetch_data(args):
-                    idx, row = args
-                    code, name = str(row[code_col]).strip(), str(row[name_col]).strip()
-                    if not code or code.lower() in ['nan', 'none']: return idx, None
-                    img = get_best_image(code, name)
-                    return idx, {"code": code, "name": name, "bs": str(row[bs_col]) if bs_col != "(なし)" else "",
-                               "size": agg_sizes.get(code, ""), "qty": agg_qtys.get(code, ""),
-                               "status": str(row[status_col]) if status_col != "(なし)" else "",
-                               "auto_url": img["url"] if img else None, "source": img["source"] if img else None, "manual_url": ""}
-                
+                elif list_mode == "MKDリスト":
+                    agg_qtys = {}
+                    for code, group in display_df.groupby(code_col):
+                        code_str = str(code).strip()
+                        total_qty = 0
+                        for _, row in group.iterrows():
+                            q_val = str(row[qty_col]).strip() if qty_col != "(なし)" else "0"
+                            try: q_num = float(q_val)
+                            except: q_num = 0
+                            total_qty += q_num
+                        agg_qtys[code_str] = str(int(total_qty) if total_qty == int(total_qty) else total_qty)
+
+                    display_df = display_df.drop_duplicates(subset=[code_col])
+                    st.info(f"自動検索中... ({len(display_df)}件)")
+                    p_bar = st.progress(0)
+                    
+                    def fetch_data(args):
+                        idx, row = args
+                        code, name = str(row[code_col]).strip(), str(row[name_col]).strip()
+                        if not code or code.lower() in ['nan', 'none']: return idx, None
+                        # リストのImage列は一切見ず、画像検索を実行
+                        img = get_best_image(code, name)
+                        return idx, {"mode": "MKD", "code": code, "name": name, "bs": str(row[bs_col]) if bs_col != "(なし)" else "",
+                                   "price": str(row[price_col]), "gender": str(row[gender_col]), "date": str(row[date_col]),
+                                   "qty": agg_qtys.get(code, "0"),
+                                   "auto_url": img["url"] if img else None, "source": img["source"] if img else None, "manual_url": ""}
+
                 unsorted = []
                 with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as exe:
                     futures = [exe.submit(fetch_data, (i, row)) for i, (_, row) in enumerate(display_df.iterrows())]
@@ -480,14 +545,21 @@ if st.session_state.generated:
             with cols[j]:
                 url = item.get("manual_url") or item.get("auto_url")
                 
-                # 🌟 StreamlitのMarkdown誤変換を防ぐため、HTMLを必ず1行に圧縮して出力します！
+                # 🌟 画像ライトボックス用のタグ
                 if url:
                     img_id = f"img_modal_{i}_{j}"
                     img_tag = f'<label for="{img_id}"><img src="{url}"></label><input type="checkbox" id="{img_id}" class="lightbox-toggle"><div class="lightbox"><label for="{img_id}" class="lightbox-close-area"></label><img src="{url}"></div>'
                 else:
                     img_tag = '<div style="color:#999; font-size:0.8rem;">画像なし</div>'
                 
-                html_card = f'<div class="product-card"><div class="product-image-container" style="height:{img_h};">{img_tag}</div><div class="product-info"><div class="product-title">{item["name"]}</div><div class="product-details">Art: {item["code"]}<br>Size: {item["size"]}<br>Qty: {item.get("qty","0")}点 / {item["status"]}</div></div></div>'
+                # 🌟 モードによるテキスト情報の切り替え
+                if item.get("mode") == "MKD":
+                    details_html = f'Art: {item["code"]}<br>Price: {item.get("price","")}<br>Gender: {item.get("gender","")}<br>Date: {item.get("date","")}<br>Qty: {item.get("qty","0")}'
+                else:
+                    details_html = f'Art: {item["code"]}<br>Size: {item.get("size","")}<br>Qty: {item.get("qty","0")}点 / {item.get("status","")}'
+
+                # 🌟 StreamlitのMarkdown誤変換を防ぐため、HTMLを必ず1行に圧縮して出力
+                html_card = f'<div class="product-card"><div class="product-image-container" style="height:{img_h};">{img_tag}</div><div class="product-info"><div class="product-title">{item["name"]}</div><div class="product-details">{details_html}</div></div></div>'
                 st.markdown(html_card, unsafe_allow_html=True)
                 
                 if not is_print_mode:
