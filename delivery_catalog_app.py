@@ -480,37 +480,16 @@ if st.session_state.generated:
             with cols[j]:
                 url = item.get("manual_url") or item.get("auto_url")
                 
-                # 🌟 画像がある場合は拡大機能（ライトボックス）用のHTMLを生成
+                # 🌟 StreamlitのMarkdown誤変換を防ぐため、HTMLを必ず1行に圧縮して出力します！
                 if url:
-                    img_id = f"img_modal_{i}_{j}"  # 画像ごとの固有ID
-                    img_tag = f'''
-                    <label for="{img_id}">
-                        <img src="{url}">
-                    </label>
-                    <input type="checkbox" id="{img_id}" class="lightbox-toggle">
-                    <div class="lightbox">
-                        <label for="{img_id}" class="lightbox-close-area"></label>
-                        <img src="{url}">
-                    </div>
-                    '''
+                    img_id = f"img_modal_{i}_{j}"
+                    img_tag = f'<label for="{img_id}"><img src="{url}"></label><input type="checkbox" id="{img_id}" class="lightbox-toggle"><div class="lightbox"><label for="{img_id}" class="lightbox-close-area"></label><img src="{url}"></div>'
                 else:
                     img_tag = '<div style="color:#999; font-size:0.8rem;">画像なし</div>'
                 
-                # カード全体のHTML
-                html_card = f"""
-                <div class="product-card">
-                    <div class="product-image-container" style="height:{img_h};">
-                        {img_tag}
-                    </div>
-                    <div class="product-info">
-                        <div class="product-title">{item["name"]}</div>
-                        <div class="product-details">Art: {item["code"]}<br>Size: {item["size"]}<br>Qty: {item.get("qty","0")}点 / {item["status"]}</div>
-                    </div>
-                </div>
-                """
+                html_card = f'<div class="product-card"><div class="product-image-container" style="height:{img_h};">{img_tag}</div><div class="product-info"><div class="product-title">{item["name"]}</div><div class="product-details">Art: {item["code"]}<br>Size: {item["size"]}<br>Qty: {item.get("qty","0")}点 / {item["status"]}</div></div></div>'
                 st.markdown(html_card, unsafe_allow_html=True)
                 
-                # 編集・検索欄はアコーディオンに収納
                 if not is_print_mode:
                     with st.expander("🔍 画像変更・検索", expanded=False):
                         st.markdown(f"<div class='no-print'><a href='https://www.google.com/search?tbm=isch&q=adidas+{item['code']}' target='_blank'>Google画像検索</a></div>", unsafe_allow_html=True)
