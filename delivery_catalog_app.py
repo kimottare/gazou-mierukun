@@ -22,17 +22,16 @@ def get_shared_store():
 st.set_page_config(page_title="商品画像見える君", layout="wide")
 
 # ==========================================
-# 🎨 究極の視認性・モバイル2列強制（背景色修正済み）
+# 🎨 究極の視認性・モバイル2列強制
 # ==========================================
 st.markdown("""
     <style>
-    /* 🌟 全体の背景をダークモードに固定（白文字をハッキリ見せるため） */
+    /* 🌟 全体の背景をダークモードに固定 */
     html, body, [data-testid="stAppViewContainer"], .stApp {
         background-color: #0e1117 !important;
         color: #ffffff !important;
     }
 
-    /* 1. タイトルの視認性 */
     .main-title {
         font-size: 2.8rem !important;
         font-weight: 900 !important;
@@ -45,7 +44,6 @@ st.markdown("""
         padding-left: 20px;
     }
 
-    /* 2. 商品名称の視認性 */
     .product-title {
         font-weight: 800;
         font-size: 1.0rem;
@@ -57,7 +55,6 @@ st.markdown("""
         text-shadow: 2px 2px 5px rgba(0,0,0,1.0) !important;
     }
 
-    /* 3. 画像コンテナ */
     .product-image-container {
         display: flex;
         justify-content: center;
@@ -88,12 +85,11 @@ st.markdown("""
         text-shadow: 1px 1px 3px rgba(0,0,0,1.0);
     }
 
-    /* 余計な表示だけ消す（ヘッダーとボタンはいじらない） */
     footer {visibility: hidden;}
     [data-testid="stDecoration"] {display: none;}
 
     /* ==========================================
-       📱 モバイル表示（スマホ）の2列強制・絶対命令
+       📱 モバイル表示（スマホ）の2列強制
        ========================================== */
     @media screen and (max-width: 800px) {
         .main-title {
@@ -135,7 +131,7 @@ st.markdown("""
         }
     }
 
-    /* 4. 印刷用設定 */
+    /* 4. 印刷用設定（紙に印刷する瞬間だけ入力欄などを消す） */
     @media print {
         header, [data-testid="stSidebar"], [data-testid="stToolbar"], 
         .stButton, .stDownloadButton, [data-testid="stExpander"],
@@ -181,7 +177,7 @@ def generate_html_report(items):
     html_content += f"</div><p style='text-align:center;font-size:0.6rem;'>出力:{now_str}</p></body></html>"
     return html_content
 
-# --- 🔍 検索ロジック（完全に固定・変更なし） ---
+# --- 🔍 検索ロジック ---
 def is_valid_adidas_img(url):
     keywords = ["adidas", "yimg", "bing", "gstatic", "shop-adidas", "mm-adidas"]
     return any(k in url.lower() for k in keywords)
@@ -271,7 +267,6 @@ with st.sidebar:
 
     st.write("---")
     
-    # 絞り込みセクション
     if st.session_state.generated:
         st.subheader("🎯 絞り込み")
         
@@ -302,7 +297,6 @@ if not st.session_state.generated:
     uploaded_file = st.file_uploader("Excel/CSVをアップロード", type=['xlsx', 'xlsm', 'csv'])
     if uploaded_file:
         try:
-            # 複数シート対応ロジック
             if uploaded_file.name.endswith('.csv'):
                 try: df = pd.read_csv(uploaded_file, na_filter=False, dtype=str, header=None, encoding='utf-8')
                 except: df = pd.read_csv(uploaded_file, na_filter=False, dtype=str, header=None, encoding='cp932')
@@ -341,7 +335,6 @@ if not st.session_state.generated:
             if st.button("カタログ作成開始", type="primary", use_container_width=True):
                 display_df = df[df[code_col].astype(str).str.strip() != ""]
                 
-                # 集計ロジック（サイズと数量を合算）
                 agg_sizes, agg_qtys = {}, {}
                 for code, group in display_df.groupby(code_col):
                     code_str = str(code).strip()
@@ -384,7 +377,6 @@ if not st.session_state.generated:
         except Exception as e: st.error(f"エラー: {e}")
 
 if st.session_state.generated:
-    # --- 絞り込みロジックの適用 ---
     items = st.session_state.catalog_items
     filtered = items
     
@@ -394,7 +386,6 @@ if st.session_state.generated:
     if is_new_only:
         filtered = [i for i in filtered if str(i.get("status", "")).strip().upper() in ["#N/A", "#REF!", "NAN", ""]]
 
-    # --- UI表示 ---
     total_q = sum([float(i.get("qty",0)) if i.get("qty") else 0 for i in filtered])
     
     if not is_print_mode:
@@ -402,7 +393,6 @@ if st.session_state.generated:
     else:
         st.caption(f"【コンパクトモード】 {len(filtered)} 品番 / {int(total_q)} 点")
 
-    # コンパクトモードでも常にQRコードとHTML保存を表示
     st.markdown("<h3 class='no-print'>📱 スマホ転送・出力</h3>", unsafe_allow_html=True)
     btn1, btn2 = st.columns(2)
     with btn1:
@@ -413,7 +403,6 @@ if st.session_state.generated:
         qr_html = f'<div style="display:flex; justify-content:center;"><div id="qrcode" style="background:white;padding:10px;border-radius:8px;"></div></div><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script><script>var url = window.parent.location.href.split("?")[0] + "?sid={sid}"; new QRCode(document.getElementById("qrcode"), {{text:url, width:120, height:120}});</script>'
         components.html(qr_html, height=150)
 
-    # --- カタログ本体 ---
     num_cols = 5 if is_print_mode else 3
     img_h = "140px" if is_print_mode else "260px"
     for i in range(0, len(filtered), num_cols):
@@ -427,11 +416,11 @@ if st.session_state.generated:
                 if url: st.markdown(f'<div class="product-image-container" style="height:{img_h};"><img src="{url}"></div>', unsafe_allow_html=True)
                 else: st.markdown(f'<div class="product-image-container" style="height:{img_h}; background:#f8f9fa;"><div style="color:#999; font-size:0.8rem;">画像なし</div></div>', unsafe_allow_html=True)
                 
-                if not is_print_mode:
-                    st.markdown(f"🔍 [Google検索](https://www.google.com/search?tbm=isch&q=adidas+{item['code']})")
-                    new_u = st.text_input("URL貼付", value=item.get("manual_url", ""), key=f"inp_{item['code']}")
-                    if new_u != item.get("manual_url"):
-                        item["manual_url"] = new_u
-                        save_auto_save_data(st.session_state.catalog_items)
-                        st.rerun()
-                    st.write("---")
+                # 🌟 修正ポイント：is_print_mode の状態に関わらず、常に検索リンクとURL貼付欄を表示します！
+                st.markdown(f"<div class='no-print'>🔍 <a href='https://www.google.com/search?tbm=isch&q=adidas+{item['code']}' target='_blank'>Google検索</a></div>", unsafe_allow_html=True)
+                new_u = st.text_input("URL貼付", value=item.get("manual_url", ""), key=f"inp_{item['code']}")
+                if new_u != item.get("manual_url"):
+                    item["manual_url"] = new_u
+                    save_auto_save_data(st.session_state.catalog_items)
+                    st.rerun()
+                st.write("---")
