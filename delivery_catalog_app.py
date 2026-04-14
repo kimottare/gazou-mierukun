@@ -329,8 +329,9 @@ if not st.session_state.generated:
                     name_col = st.selectbox("Name", columns, index=guess_column_index(columns, ['商品名称', '名称', 'name', 'item', 'description'], exclude=['size', 'サイズ', '店舗', 'store']))
                     qty_col = st.selectbox("Qty", ["(なし)"] + columns, index=guess_column_index(columns, ['qty', '数量'], exclude=['inv qty'])+1)
                 with c3:
-                    bs_col = st.selectbox("BS", columns if 'bs' in [str(c).lower() for c in columns] else ["(なし)"]+columns, index=guess_column_index(columns, ['bs', 'category'], exclude=['size', 'サイズ'])+1)
-                    status_col = st.selectbox("Status", ["(なし)"] + columns, index=guess_column_index(columns, ['inv qty', 'status', 'ステータス'], default_idx=len(columns)))
+                    # 🌟 修正ポイント：BS列のリストとインデックス計算を統一し、ズレのバグを完全解消
+                    bs_col = st.selectbox("BS", ["(なし)"] + columns, index=guess_column_index(columns, ['bs', 'category'], exclude=['size', 'サイズ'])+1)
+                    status_col = st.selectbox("Status", ["(なし)"] + columns, index=guess_column_index(columns, ['inv qty', 'status', 'ステータス'], default_idx=len(columns)-1)+1)
 
             if st.button("カタログ作成開始", type="primary", use_container_width=True):
                 display_df = df[df[code_col].astype(str).str.strip() != ""]
