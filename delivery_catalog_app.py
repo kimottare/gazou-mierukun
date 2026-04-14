@@ -22,7 +22,7 @@ def get_shared_store():
 st.set_page_config(page_title="商品画像見える君", layout="wide")
 
 # ==========================================
-# 🎨 究極の視認性・スマホ1列リスト強制デザイン
+# 🎨 究極の視認性・スマホ1列リスト強制 ＋ 画像拡大機能
 # ==========================================
 st.markdown("""
     <style>
@@ -44,10 +44,10 @@ st.markdown("""
         padding-left: 20px;
     }
 
-    /* 🌟 新設：カード全体と情報エリアのラッパー */
+    /* 🌟 カード全体と情報エリアのラッパー */
     .product-card {
         display: flex;
-        flex-direction: column; /* PCデフォルトは縦並び */
+        flex-direction: column; 
         height: 100%;
     }
     .product-info {
@@ -96,11 +96,47 @@ st.markdown("""
         text-shadow: 1px 1px 3px rgba(0,0,0,1.0);
     }
 
+    /* 🌟 画像拡大（ライトボックス）機能のCSS */
+    .lightbox-toggle { display: none; }
+    .lightbox {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; width: 100vw; height: 100vh;
+        background-color: rgba(0, 0, 0, 0.85);
+        z-index: 9999999;
+        justify-content: center;
+        align-items: center;
+        backdrop-filter: blur(5px);
+    }
+    .lightbox img {
+        max-width: 95vw; max-height: 95vh;
+        object-fit: contain;
+        border-radius: 8px;
+        box-shadow: 0 4px 25px rgba(0,0,0,0.8);
+        position: relative;
+        z-index: 2;
+    }
+    .lightbox-toggle:checked + .lightbox {
+        display: flex;
+    }
+    .lightbox-close-area {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        cursor: zoom-out;
+        z-index: 1;
+    }
+    .product-image-container label {
+        cursor: zoom-in;
+        width: 100%; height: 100%;
+        display: flex; justify-content: center; align-items: center;
+        margin: 0; padding: 0;
+    }
+
     footer {visibility: hidden;}
     [data-testid="stDecoration"] {display: none;}
 
     /* ==========================================
-       📱 モバイル表示（スマホ）の1列リスト化・完全最適化
+       📱 モバイル表示（スマホ）の1列リスト化
        ========================================== */
     @media screen and (max-width: 800px) {
         .main-title {
@@ -121,10 +157,10 @@ st.markdown("""
             width: 100% !important;
             max-width: 100% !important;
             padding: 12px 0 !important;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1); /* リストの区切り線 */
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1); 
         }
 
-        /* 🌟 画像左・テキスト右の横並びレイアウトに変更 */
+        /* 横並びレイアウトに変更 */
         .product-card {
             flex-direction: row !important;
             align-items: center;
@@ -133,24 +169,24 @@ st.markdown("""
 
         .product-image-container {
             width: 80px !important;
-            height: 80px !important; /* 強制的に正方形のサムネイル化 */
+            height: 80px !important; 
             min-width: 80px;
             margin-bottom: 0 !important;
             margin-right: 15px;
             border-radius: 6px;
-            box-shadow: none !important; /* フラットデザインに */
+            box-shadow: none !important; 
         }
 
         .product-info {
             flex-grow: 1;
-            overflow: hidden; /* テキストのはみ出し防止 */
+            overflow: hidden; 
         }
 
         .product-title {
             font-size: 1.0rem !important;
             height: auto !important;
-            white-space: nowrap; /* 商品名を1行に制限 */
-            text-overflow: ellipsis; /* 長い場合は「...」に */
+            white-space: nowrap; 
+            text-overflow: ellipsis; 
             margin-bottom: 4px;
         }
 
@@ -162,7 +198,7 @@ st.markdown("""
         }
     }
 
-    /* 4. 印刷用設定（変更なし） */
+    /* 4. 印刷用設定 */
     @media print {
         header, [data-testid="stSidebar"], [data-testid="stToolbar"], 
         .stButton, .stDownloadButton, [data-testid="stExpander"],
@@ -180,6 +216,7 @@ st.markdown("""
         .product-details { color: #333 !important; text-shadow: none !important; font-size: 0.65rem; }
         .product-image-container { border: 1px solid #aaa !important; box-shadow: none !important; }
         .product-image-container img { filter: none !important; }
+        .lightbox, .lightbox-toggle { display: none !important; }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -299,7 +336,6 @@ with st.sidebar:
 
     st.write("---")
     
-    # 絞り込みセクション
     if st.session_state.generated:
         st.subheader("🎯 絞り込み")
         
@@ -330,7 +366,6 @@ if not st.session_state.generated:
     uploaded_file = st.file_uploader("Excel/CSVをアップロード", type=['xlsx', 'xlsm', 'csv'])
     if uploaded_file:
         try:
-            # 複数シート対応ロジック
             if uploaded_file.name.endswith('.csv'):
                 try: df = pd.read_csv(uploaded_file, na_filter=False, dtype=str, header=None, encoding='utf-8')
                 except: df = pd.read_csv(uploaded_file, na_filter=False, dtype=str, header=None, encoding='cp932')
@@ -369,7 +404,6 @@ if not st.session_state.generated:
             if st.button("カタログ作成開始", type="primary", use_container_width=True):
                 display_df = df[df[code_col].astype(str).str.strip() != ""]
                 
-                # 集計ロジック（サイズと数量を合算）
                 agg_sizes, agg_qtys = {}, {}
                 for code, group in display_df.groupby(code_col):
                     code_str = str(code).strip()
@@ -445,9 +479,24 @@ if st.session_state.generated:
         for j, item in enumerate(filtered[i:i+num_cols]):
             with cols[j]:
                 url = item.get("manual_url") or item.get("auto_url")
-                img_tag = f'<img src="{url}">' if url else '<div style="color:#999; font-size:0.8rem;">画像なし</div>'
                 
-                # 🌟 新設：写真のようなレイアウトを実現するため、1つのカードHTMLに統合
+                # 🌟 画像がある場合は拡大機能（ライトボックス）用のHTMLを生成
+                if url:
+                    img_id = f"img_modal_{i}_{j}"  # 画像ごとの固有ID
+                    img_tag = f'''
+                    <label for="{img_id}">
+                        <img src="{url}">
+                    </label>
+                    <input type="checkbox" id="{img_id}" class="lightbox-toggle">
+                    <div class="lightbox">
+                        <label for="{img_id}" class="lightbox-close-area"></label>
+                        <img src="{url}">
+                    </div>
+                    '''
+                else:
+                    img_tag = '<div style="color:#999; font-size:0.8rem;">画像なし</div>'
+                
+                # カード全体のHTML
                 html_card = f"""
                 <div class="product-card">
                     <div class="product-image-container" style="height:{img_h};">
@@ -461,7 +510,7 @@ if st.session_state.generated:
                 """
                 st.markdown(html_card, unsafe_allow_html=True)
                 
-                # 🌟 新設：リストをスッキリさせるため、編集・検索欄をアコーディオンに収納
+                # 編集・検索欄はアコーディオンに収納
                 if not is_print_mode:
                     with st.expander("🔍 画像変更・検索", expanded=False):
                         st.markdown(f"<div class='no-print'><a href='https://www.google.com/search?tbm=isch&q=adidas+{item['code']}' target='_blank'>Google画像検索</a></div>", unsafe_allow_html=True)
