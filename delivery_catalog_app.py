@@ -88,7 +88,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 🔍 ロジック補助・画像検索（最大ヒット率） ---
+# --- 🔍 高精度・検索ロジック ---
 def guess_column_index(columns, keywords, default_idx=0, exclude=[]):
     for keyword in keywords:
         for idx, col in enumerate(columns):
@@ -97,41 +97,50 @@ def guess_column_index(columns, keywords, default_idx=0, exclude=[]):
                 return idx
     return default_idx
 
-def is_valid_adidas_img(url):
-    keywords = ["adidas", "yimg", "bing", "gstatic", "shop-adidas", "mm-adidas"]
-    return any(k in url.lower() for k in keywords)
-
 def get_best_image(code, name=""):
     code_str = str(code).strip().upper()
-    query = f"adidas {name} {code_str}".strip()
-
-    # 1. まず楽天APIで高精度検索
+    
+    # 🌟 1. 楽天API (商品名に品番が完全一致する場合のみ採用：確実性MAX)
     try:
         url = "https://app.rakuten.co.jp/services/api/IchibaItem/Search/20220601"
         res = requests.get(url, params={"applicationId": RAKUTEN_APP_ID, "keyword": f"adidas {code_str}", "hits": 3}, timeout=3)
         if res.status_code == 200:
             items = res.json().get("Items", [])
             for item in items:
-                img_url = item["Item"]["mediumImageUrls"][0]["imageUrl"].split("?_ex=")[0]
-                if code_str.lower() in item["Item"].get("itemName", "").lower():
-                    return {"url": img_url}
+                item_name = item["Item"].get("itemName", "").upper()
+                if code_str in item_name: # 品番が商品名に含まれているか厳格チェック
+                    return {"url": item["Item"]["mediumImageUrls"][0]["imageUrl"].split("?_ex=")[0]}
     except: pass
 
-    # 2. 楽天で見つからない場合はBing画像検索で広範に探す
+    # 🌟 2. Bing画像検索 (URLではなく、画像の「タイトル」を検証する新ロジック)
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
     try:
+        # 検索クエリをシンプルに「ブランド名＋品番」に絞り、ノイズを減らす
+        query = f"adidas {code_str}"
         bing_url = f"https://www.bing.com/images/search?q={query}"
         res = requests.get(bing_url, headers=headers, timeout=5)
         soup = BeautifulSoup(res.text, 'html.parser')
+        
+        # 検索結果の上位から検証
+        for a in soup.find_all('a', class_='iusc'):
+            m_str = a.get('m')
+            if m_str:
+                m_data = json.loads(m_str)
+                murl = m_data.get('murl', '')
+                title = m_data.get('t', '').upper() # 画像のタイトル/代替テキストを取得
+                
+                if not murl: continue
+                
+                # タイトルに品番、または「ADIDAS」が含まれていれば、検索上位のため正解の確率が極めて高い
+                if code_str in title or "ADIDAS" in title or "アディダス" in title:
+                    return {"url": murl}
+                    
+        # 上記の条件に当てはまらなくても、検索結果が存在すればその1枚目を信じる（フォールバック）
         for a in soup.find_all('a', class_='iusc'):
             m_str = a.get('m')
             if m_str:
                 murl = json.loads(m_str).get('murl')
-                if murl and code_str.lower() in murl.lower() and is_valid_adidas_img(murl):
-                    return {"url": murl}
-                # 品番が含まれていなくてもadidas関連の画像なら許容
-                if murl and "adidas" in murl.lower():
-                    return {"url": murl}
+                if murl: return {"url": murl}
     except: pass
 
     return None
@@ -159,7 +168,8 @@ if "catalog_items" not in st.session_state:
 
 with st.sidebar:
     st.header("⚙️ 管理メニュー")
-    concurrency = st.slider("⚡ 検索スピード", 1, 10, 5)
+    # 🌟 質（取得率）を優先するため、デフォルトの検索スピードを「3」に下げる（Bingからのブロック回避）
+    concurrency = st.slider("⚡ 検索スピード", 1, 10, 3)
     is_print_mode = st.toggle("コンパクトモード (5列)", value=False)
     
     if st.button("🖨️ 印刷する", use_container_width=True, type="primary"):
@@ -198,7 +208,7 @@ if not st.session_state.generated:
     uploaded_file = st.file_uploader("Excel/CSVをアップロード", type=['xlsx', 'csv'])
     if uploaded_file:
         try:
-            # マルチシート対応の安全性確保
+            # マルチシート対応
             if uploaded_file.name.endswith('.csv'):
                 try: df = pd.read_csv(uploaded_file, na_filter=False, dtype=str, header=None, encoding='utf-8')
                 except: df = pd.read_csv(uploaded_file, na_filter=False, dtype=str, header=None, encoding='cp932')
@@ -220,7 +230,7 @@ if not st.session_state.generated:
             df.columns = df.iloc[h_idx].tolist()
             df = df.iloc[h_idx+1:].reset_index(drop=True)
 
-            # 🌟 プルダウン破壊防止：空白列や重複列を安全にリネーム
+            # 🌟 プルダウン破壊防止リネーム
             raw_cols = [str(c).strip() if str(c).strip() and str(c).lower() != 'nan' else f"列{i+1}" for i, c in enumerate(df.columns)]
             cols = []
             seen = set()
@@ -234,7 +244,7 @@ if not st.session_state.generated:
                 seen.add(new_c)
             df.columns = cols
 
-            # 🌟 列の自動紐付け（現場フォーマットを最優先）
+            # 🌟 列の自動紐付け（写真の現場フォーマットを最優先）
             with st.expander("📋 列の紐付け確認", expanded=True):
                 c1, c2, c3 = st.columns(3)
                 art_c = c1.selectbox("品番 (Article)", cols, index=guess_column_index(cols, ['material number', 'art', 'code', '品番']))
@@ -247,7 +257,8 @@ if not st.session_state.generated:
             if st.button("カタログ作成開始", type="primary", use_container_width=True):
                 results = []
                 progress = st.progress(0)
-                target_df = df[df[art_c].notnull() & (df[art_c] != "")].drop_duplicates(subset=[art_c])
+                # 空白や欠損の品番を除外
+                target_df = df[df[art_c].notnull() & (df[art_c] != "") & (df[art_c].str.lower() != "nan")].drop_duplicates(subset=[art_c])
                 with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as exe:
                     futures = {exe.submit(get_best_image, row[art_c], row[name_c]): row for _, row in target_df.iterrows()}
                     for i, f in enumerate(concurrent.futures.as_completed(futures)):
@@ -299,7 +310,7 @@ if st.session_state.generated:
                 else: st.markdown(f'<div class="product-image-container" style="height:{img_h}; background:#f8f9fa;"><div style="color:#999; font-size:0.8rem;">画像なし</div></div>', unsafe_allow_html=True)
                 
                 if not is_print_mode:
-                    # 🌟 Google画像検索リンク
+                    # Google画像検索リンク
                     st.markdown(f"🔍 [Google検索](https://www.google.com/search?tbm=isch&q=adidas+{item['code']})")
                     new_u = st.text_input("URL貼付", value=item["manual_url"], key=f"inp_{item['code']}")
                     if new_u != item["manual_url"]:
