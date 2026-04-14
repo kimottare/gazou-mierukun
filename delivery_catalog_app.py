@@ -100,7 +100,7 @@ def guess_column_index(columns, keywords, default_idx=0, exclude=[]):
 def get_best_image(code, name=""):
     code_str = str(code).strip().upper()
     
-    # 🌟 1. 楽天API (商品名に品番が完全一致する場合のみ採用：確実性MAX)
+    # 🌟 1. 楽天API (商品名に品番が完全一致する場合のみ採用)
     try:
         url = "https://app.rakuten.co.jp/services/api/IchibaItem/Search/20220601"
         res = requests.get(url, params={"applicationId": RAKUTEN_APP_ID, "keyword": f"adidas {code_str}", "hits": 3}, timeout=3)
@@ -108,34 +108,30 @@ def get_best_image(code, name=""):
             items = res.json().get("Items", [])
             for item in items:
                 item_name = item["Item"].get("itemName", "").upper()
-                if code_str in item_name: # 品番が商品名に含まれているか厳格チェック
+                if code_str in item_name: 
                     return {"url": item["Item"]["mediumImageUrls"][0]["imageUrl"].split("?_ex=")[0]}
     except: pass
 
-    # 🌟 2. Bing画像検索 (URLではなく、画像の「タイトル」を検証する新ロジック)
+    # 🌟 2. Bing画像検索 (画像の「タイトル」を検証するロジック)
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
     try:
-        # 検索クエリをシンプルに「ブランド名＋品番」に絞り、ノイズを減らす
         query = f"adidas {code_str}"
         bing_url = f"https://www.bing.com/images/search?q={query}"
         res = requests.get(bing_url, headers=headers, timeout=5)
         soup = BeautifulSoup(res.text, 'html.parser')
         
-        # 検索結果の上位から検証
         for a in soup.find_all('a', class_='iusc'):
             m_str = a.get('m')
             if m_str:
                 m_data = json.loads(m_str)
                 murl = m_data.get('murl', '')
-                title = m_data.get('t', '').upper() # 画像のタイトル/代替テキストを取得
+                title = m_data.get('t', '').upper()
                 
                 if not murl: continue
                 
-                # タイトルに品番、または「ADIDAS」が含まれていれば、検索上位のため正解の確率が極めて高い
                 if code_str in title or "ADIDAS" in title or "アディダス" in title:
                     return {"url": murl}
                     
-        # 上記の条件に当てはまらなくても、検索結果が存在すればその1枚目を信じる（フォールバック）
         for a in soup.find_all('a', class_='iusc'):
             m_str = a.get('m')
             if m_str:
@@ -168,7 +164,6 @@ if "catalog_items" not in st.session_state:
 
 with st.sidebar:
     st.header("⚙️ 管理メニュー")
-    # 🌟 質（取得率）を優先するため、デフォルトの検索スピードを「3」に下げる（Bingからのブロック回避）
     concurrency = st.slider("⚡ 検索スピード", 1, 10, 3)
     is_print_mode = st.toggle("コンパクトモード (5列)", value=False)
     
@@ -230,7 +225,7 @@ if not st.session_state.generated:
             df.columns = df.iloc[h_idx].tolist()
             df = df.iloc[h_idx+1:].reset_index(drop=True)
 
-            # 🌟 プルダウン破壊防止リネーム
+            # プルダウン破壊防止リネーム
             raw_cols = [str(c).strip() if str(c).strip() and str(c).lower() != 'nan' else f"列{i+1}" for i, c in enumerate(df.columns)]
             cols = []
             seen = set()
@@ -244,11 +239,14 @@ if not st.session_state.generated:
                 seen.add(new_c)
             df.columns = cols
 
-            # 🌟 列の自動紐付け（写真の現場フォーマットを最優先）
+            # 🌟 修正ポイント：店舗名称を排除し、正しい商品名称を優先取得する
             with st.expander("📋 列の紐付け確認", expanded=True):
                 c1, c2, c3 = st.columns(3)
                 art_c = c1.selectbox("品番 (Article)", cols, index=guess_column_index(cols, ['material number', 'art', 'code', '品番']))
-                name_c = c2.selectbox("商品名称 (Name)", cols, index=guess_column_index(cols, ['名称', 'name', 'desc'], exclude=['size']))
+                
+                # '店舗' や 'store' を除外し、'商品名称' などを優先
+                name_c = c2.selectbox("商品名称 (Name)", cols, index=guess_column_index(cols, ['商品名称', '商品名', 'article description', 'description', 'name', '名称'], exclude=['size', 'サイズ', '店舗', 'store']))
+                
                 bs_c = c3.selectbox("BS (カテゴリー)", cols, index=guess_column_index(cols, ['bs', 'category', '部門'], exclude=['size', 'サイズ']))
                 size_c = c1.selectbox("サイズ (Size)", cols, index=guess_column_index(cols, ['size description', 'size', 'サイズ']))
                 qty_c = c2.selectbox("数量 (Qty)", cols, index=guess_column_index(cols, ['qty', '数量'], exclude=['inv qty']))
