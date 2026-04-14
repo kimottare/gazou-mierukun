@@ -22,10 +22,16 @@ def get_shared_store():
 st.set_page_config(page_title="商品画像見える君", layout="wide")
 
 # ==========================================
-# 🎨 究極の視認性・モバイル2列強制（ヘッダー操作は全削除）
+# 🎨 究極の視認性・モバイル2列強制（背景色修正済み）
 # ==========================================
 st.markdown("""
     <style>
+    /* 🌟 全体の背景をダークモードに固定（白文字をハッキリ見せるため） */
+    html, body, [data-testid="stAppViewContainer"], .stApp {
+        background-color: #0e1117 !important;
+        color: #ffffff !important;
+    }
+
     /* 1. タイトルの視認性 */
     .main-title {
         font-size: 2.8rem !important;
@@ -142,7 +148,7 @@ st.markdown("""
             padding: 0 !important;
             margin: 0 !important;
         }
-        body { background-color: white !important; }
+        body, html, [data-testid="stAppViewContainer"], .stApp { background-color: white !important; }
         .product-title { color: #000 !important; text-shadow: none !important; font-size: 0.85rem; }
         .product-details { color: #333 !important; text-shadow: none !important; font-size: 0.65rem; }
         .product-image-container { border: 1px solid #eee; box-shadow: none; }
@@ -329,7 +335,6 @@ if not st.session_state.generated:
                     name_col = st.selectbox("Name", columns, index=guess_column_index(columns, ['商品名称', '名称', 'name', 'item', 'description'], exclude=['size', 'サイズ', '店舗', 'store']))
                     qty_col = st.selectbox("Qty", ["(なし)"] + columns, index=guess_column_index(columns, ['qty', '数量'], exclude=['inv qty'])+1)
                 with c3:
-                    # 🌟 修正ポイント：BS列のリストとインデックス計算を統一し、ズレのバグを完全解消
                     bs_col = st.selectbox("BS", ["(なし)"] + columns, index=guess_column_index(columns, ['bs', 'category'], exclude=['size', 'サイズ'])+1)
                     status_col = st.selectbox("Status", ["(なし)"] + columns, index=guess_column_index(columns, ['inv qty', 'status', 'ステータス'], default_idx=len(columns)-1)+1)
 
