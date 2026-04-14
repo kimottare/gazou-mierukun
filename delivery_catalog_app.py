@@ -22,11 +22,11 @@ def get_shared_store():
 st.set_page_config(page_title="商品画像見える君", layout="wide")
 
 # ==========================================
-# 🎨 究極の視認性・モバイル2列・安全なメニューボタンCSS
+# 🎨 究極の視認性・モバイル2列強制（ヘッダー操作は全削除）
 # ==========================================
 st.markdown("""
     <style>
-    /* 1. タイトルの視認性（白文字 + 強力なシャドウ） */
+    /* 1. タイトルの視認性 */
     .main-title {
         font-size: 2.8rem !important;
         font-weight: 900 !important;
@@ -39,7 +39,7 @@ st.markdown("""
         padding-left: 20px;
     }
 
-    /* 2. 商品名称の視認性（白文字 + 影） */
+    /* 2. 商品名称の視認性 */
     .product-title {
         font-weight: 800;
         font-size: 1.0rem;
@@ -51,7 +51,7 @@ st.markdown("""
         text-shadow: 2px 2px 5px rgba(0,0,0,1.0) !important;
     }
 
-    /* 3. 画像コンテナ（等高・整列） */
+    /* 3. 画像コンテナ */
     .product-image-container {
         display: flex;
         justify-content: center;
@@ -82,27 +82,9 @@ st.markdown("""
         text-shadow: 1px 1px 3px rgba(0,0,0,1.0);
     }
 
-    /* ==========================================
-       🌟 メニューボタン＆ヘッダーの安全な制御
-       ========================================== */
+    /* 余計な表示だけ消す（ヘッダーとボタンはいじらない） */
     footer {visibility: hidden;}
     [data-testid="stDecoration"] {display: none;}
-    
-    /* 黒い帯（ヘッダー全体）の背景を透明にして圧迫感を消す */
-    [data-testid="stHeader"] {
-        background-color: transparent !important;
-    }
-    
-    /* 右上の不要なメニュー（Share等）を完全に消す */
-    [data-testid="stToolbar"] { 
-        display: none !important; 
-    }
-    
-    /* 左上のメニュー開閉ボタン（ハンバーガー）だけをうっすら白くして確実に見えるようにする */
-    [data-testid="stHeader"] button {
-        background-color: rgba(255, 255, 255, 0.15) !important;
-        border-radius: 6px !important;
-    }
 
     /* ==========================================
        📱 モバイル表示（スマホ）の2列強制・絶対命令
