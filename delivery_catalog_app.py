@@ -25,29 +25,19 @@ st.set_page_config(page_title="商品画像見える君", layout="wide")
 # ==========================================
 st.markdown("""
     <style>
-    /* 1. 基本フォント・背景 */
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700;900&display=swap');
     html, body, [data-testid="stAppViewContainer"] {
         font-family: 'Noto Sans JP', sans-serif;
         background-color: #0e1117;
     }
 
-    /* 2. ヘッダー制御：右側メニューを消し、左側のハンバーガーボタンを絶対に出す */
+    /* ヘッダーは標準表示（ハンバーガーボタン確保）、右メニューのみ非表示 */
     [data-testid="stHeader"] {
         background-color: rgba(14, 17, 23, 0.8) !important;
         visibility: visible !important;
     }
-    [data-testid="stToolbar"] {
-        display: none !important; /* 右上のShare, Star等を非表示 */
-    }
-    button[data-testid="stSidebarCollapseButton"] {
-        visibility: visible !important;
-        color: #ffffff !important;
-        background-color: rgba(255,255,255,0.2) !important;
-        border-radius: 8px !important;
-    }
+    [data-testid="stToolbar"] { display: none !important; }
 
-    /* 3. タイトル・文字視認性 */
     .main-title {
         font-size: 2.5rem !important; font-weight: 900 !important; color: #ffffff !important;
         text-shadow: 3px 3px 12px rgba(0,0,0,1.0), 0 0 25px rgba(0,0,0,0.8) !important;
@@ -63,8 +53,6 @@ st.markdown("""
         height: 3.9em; overflow: hidden; margin-bottom: 8px;
         text-shadow: 1px 1px 3px rgba(0,0,0,1.0);
     }
-
-    /* 4. 画像コンテナ */
     .product-image-container {
         display: flex; justify-content: center; align-items: center;
         background: #ffffff; border-radius: 8px; border: 1px solid #333;
@@ -75,7 +63,7 @@ st.markdown("""
     footer {visibility: hidden;}
     [data-testid="stDecoration"] {display: none;}
 
-    /* 📱 スマホ表示（2列強制：iPhone Edge/Safari対応） */
+    /* 📱 スマホ2列強制（iPhone Edge/Safari） */
     @media screen and (max-width: 800px) {
         div[data-testid="stHorizontalBlock"] {
             display: flex !important; flex-direction: row !important;
@@ -89,7 +77,7 @@ st.markdown("""
         .main-title { font-size: 1.5rem !important; border-left-width: 8px; padding-left: 12px; margin-top: 2rem !important; }
     }
 
-    /* 🖨️ 印刷用：背景白・文字黒 */
+    /* 🖨️ 印刷設定 */
     @media print {
         header, [data-testid="stSidebar"], .no-print, iframe, .stTextInput, .stAlert, hr { display: none !important; }
         body, .main, [data-testid="stAppViewContainer"] { background-color: white !important; color: black !important; }
@@ -101,7 +89,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 🔍 検索・ロジック補助 ---
+# --- 🔍 ヘルパー関数 ---
 def guess_column_index(columns, keywords, default_idx=0, exclude=[]):
     for keyword in keywords:
         for idx, col in enumerate(columns):
@@ -128,7 +116,7 @@ def save_auto_save_data(items):
     except: pass 
 
 # ==========================================
-# メイン UI
+# UI
 # ==========================================
 st.markdown('<div class="main-title">📦 商品画像見える君</div>', unsafe_allow_html=True)
 
@@ -178,7 +166,7 @@ with st.sidebar:
             st.session_state.generated = False
             st.rerun()
 
-# --- アップロード & マルチシート対応 ---
+# --- アップロード & 列判定 ---
 if not st.session_state.generated:
     uploaded_file = st.file_uploader("Excel/CSVをアップロード", type=['xlsx', 'csv'])
     if uploaded_file:
@@ -187,7 +175,7 @@ if not st.session_state.generated:
                 try: df = pd.read_csv(uploaded_file, na_filter=False, dtype=str, header=None, encoding='utf-8')
                 except: df = pd.read_csv(uploaded_file, na_filter=False, dtype=str, header=None, encoding='cp932')
             else:
-                # 🌟 マルチシート対応：全シート名を読み込む
+                # マルチシート対応
                 xl = pd.ExcelFile(uploaded_file)
                 sheet_names = xl.sheet_names
                 if len(sheet_names) > 1:
@@ -196,26 +184,43 @@ if not st.session_state.generated:
                     selected_sheet = sheet_names[0]
                 df = pd.read_excel(uploaded_file, sheet_name=selected_sheet, na_filter=False, dtype=str, header=None)
 
-            # ヘッダー検知
+            # 🌟 ヘッダー検知（完全修復）
             h_idx = 0
             for i, row in df.iterrows():
-                if sum(1 for v in row if str(v).strip() != "") >= 3: h_idx = i; break
-            df.columns = df.iloc[h_idx]; df = df.iloc[h_idx+1:].reset_index(drop=True)
-            cols = [str(c).strip() for c in df.columns]
+                valid_cells = sum(1 for v in row if str(v).strip() != "" and str(v).lower() != "nan")
+                if valid_cells >= 3: 
+                    h_idx = i; break
+            df.columns = df.iloc[h_idx].tolist()
+            df = df.iloc[h_idx+1:].reset_index(drop=True)
 
+            # 🌟 プルダウン破損の抜本的解決：空白列・重複列を安全にリネーム
+            raw_cols = [str(c).strip() if str(c).strip() and str(c).lower() != 'nan' else f"列{i+1}" for i, c in enumerate(df.columns)]
+            cols = []
+            seen = set()
+            for c in raw_cols:
+                new_c = c
+                count = 1
+                while new_c in seen:
+                    new_c = f"{c}_{count}"
+                    count += 1
+                cols.append(new_c)
+                seen.add(new_c)
+            df.columns = cols # DFの列名も更新しておく
+
+            # 🌟 紐付け設定（Material Number 等の英語フォーマットにも自動対応）
             with st.expander("📋 列の紐付け確認", expanded=True):
                 c1, c2, c3 = st.columns(3)
-                art_c = c1.selectbox("品番 (Article)", cols, index=guess_column_index(cols, ['art', 'code']))
-                name_c = c2.selectbox("商品名称 (Name)", cols, index=guess_column_index(cols, ['名称', 'name']))
-                bs_c = c3.selectbox("BS (カテゴリー)", cols, index=guess_column_index(cols, ['BS'], exclude=['size', 'サイズ']))
+                art_c = c1.selectbox("品番 (Article)", cols, index=guess_column_index(cols, ['art', 'code', 'material', '品番']))
+                name_c = c2.selectbox("商品名称 (Name)", cols, index=guess_column_index(cols, ['名称', 'name', 'desc'], exclude=['size']))
+                bs_c = c3.selectbox("BS (カテゴリー)", cols, index=guess_column_index(cols, ['bs', 'category', '部門'], exclude=['size', 'サイズ']))
                 size_c = c1.selectbox("サイズ (Size)", cols, index=guess_column_index(cols, ['size', 'サイズ']))
-                qty_c = c2.selectbox("数量 (Qty)", cols, index=guess_column_index(cols, ['qty', '数量']))
-                status_c = c3.selectbox("ステータス (Status)", cols, index=min(11, len(cols)-1)) # 列12デフォルト
+                qty_c = c2.selectbox("数量 (Qty)", cols, index=guess_column_index(cols, ['qty', '数量', 'inv']))
+                status_c = c3.selectbox("ステータス (Status)", cols, index=min(11, len(cols)-1)) # 列12
 
             if st.button("カタログ作成開始", type="primary", use_container_width=True):
                 results = []
                 progress = st.progress(0)
-                target_df = df[df[art_c].notnull()].drop_duplicates(subset=[art_c])
+                target_df = df[df[art_c].notnull() & (df[art_c] != "")].drop_duplicates(subset=[art_c])
                 with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as exe:
                     futures = {exe.submit(get_best_image, row[art_c], row[name_c]): row for _, row in target_df.iterrows()}
                     for i, f in enumerate(concurrent.futures.as_completed(futures)):
@@ -232,7 +237,7 @@ if not st.session_state.generated:
                 save_auto_save_data(results)
                 st.rerun()
         except Exception as e:
-            st.error(f"エラーが発生しました: {e}")
+            st.error(f"読み込みエラーが発生しました: {e}")
 
 # --- 📊 メイン表示 ---
 if st.session_state.generated:
@@ -251,7 +256,7 @@ if st.session_state.generated:
     qr_html = f'<div style="text-align:center;"><div id="qrcode" style="display:inline-block;background:white;padding:10px;border-radius:8px;"></div></div><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script><script>new QRCode(document.getElementById("qrcode"), {{text:window.parent.location.href.split("?")[0]+"?sid={sid}", width:120, height:120}});</script>'
     components.html(qr_html, height=150)
 
-    # カタログ本体（標準3列 / コンパクト5列）
+    # 3列カタログ
     n_cols = 5 if is_print_mode else 3
     img_h = "140px" if is_print_mode else "200px"
 
