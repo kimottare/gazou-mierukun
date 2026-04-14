@@ -25,19 +25,29 @@ st.set_page_config(page_title="商品画像見える君", layout="wide")
 # ==========================================
 st.markdown("""
     <style>
+    /* 1. 基本フォント・背景 */
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700;900&display=swap');
     html, body, [data-testid="stAppViewContainer"] {
         font-family: 'Noto Sans JP', sans-serif;
         background-color: #0e1117;
     }
 
-    /* 1. ヘッダー：確実にボタンを表示させる設定 */
+    /* 2. ヘッダー制御：右側メニューを消し、左側のハンバーガーボタンを絶対に出す */
     [data-testid="stHeader"] {
         background-color: rgba(14, 17, 23, 0.8) !important;
         visibility: visible !important;
     }
+    [data-testid="stToolbar"] {
+        display: none !important; /* 右上のShare, Star等を非表示 */
+    }
+    button[data-testid="stSidebarCollapseButton"] {
+        visibility: visible !important;
+        color: #ffffff !important;
+        background-color: rgba(255,255,255,0.2) !important;
+        border-radius: 8px !important;
+    }
 
-    /* 2. 文字の視認性 */
+    /* 3. タイトル・文字視認性 */
     .main-title {
         font-size: 2.5rem !important; font-weight: 900 !important; color: #ffffff !important;
         text-shadow: 3px 3px 12px rgba(0,0,0,1.0), 0 0 25px rgba(0,0,0,0.8) !important;
@@ -54,7 +64,7 @@ st.markdown("""
         text-shadow: 1px 1px 3px rgba(0,0,0,1.0);
     }
 
-    /* 3. 画像コンテナ */
+    /* 4. 画像コンテナ */
     .product-image-container {
         display: flex; justify-content: center; align-items: center;
         background: #ffffff; border-radius: 8px; border: 1px solid #333;
@@ -62,7 +72,10 @@ st.markdown("""
     }
     .product-image-container img { max-height: 100%; max-width: 100%; object-fit: contain; }
 
-    /* 📱 スマホ表示：2列強制（iPhone Edge/Safari対応） */
+    footer {visibility: hidden;}
+    [data-testid="stDecoration"] {display: none;}
+
+    /* 📱 スマホ表示（2列強制：iPhone Edge/Safari対応） */
     @media screen and (max-width: 800px) {
         div[data-testid="stHorizontalBlock"] {
             display: flex !important; flex-direction: row !important;
@@ -88,7 +101,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 🔍 検索ロジック ---
+# --- 🔍 検索・ロジック補助 ---
 def guess_column_index(columns, keywords, default_idx=0, exclude=[]):
     for keyword in keywords:
         for idx, col in enumerate(columns):
@@ -115,7 +128,7 @@ def save_auto_save_data(items):
     except: pass 
 
 # ==========================================
-# メイン表示
+# メイン UI
 # ==========================================
 st.markdown('<div class="main-title">📦 商品画像見える君</div>', unsafe_allow_html=True)
 
@@ -134,7 +147,7 @@ with st.sidebar:
     concurrency = st.slider("⚡ 検索スピード", 1, 10, 5)
     is_print_mode = st.toggle("コンパクトモード (5列)", value=False)
     
-    if st.button("🖨️ 印刷する", use_container_width=True, type="primary"):
+    if st.button("🖨️ カタログを印刷", use_container_width=True, type="primary"):
         components.html("<script>window.parent.print();</script>", height=0)
 
     if st.session_state.generated:
@@ -165,45 +178,61 @@ with st.sidebar:
             st.session_state.generated = False
             st.rerun()
 
-# --- アップロード ---
+# --- アップロード & マルチシート対応 ---
 if not st.session_state.generated:
     uploaded_file = st.file_uploader("Excel/CSVをアップロード", type=['xlsx', 'csv'])
     if uploaded_file:
-        df = pd.read_excel(uploaded_file, header=None) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file, header=None)
-        h_idx = 0
-        for i, row in df.iterrows():
-            if sum(1 for v in row if str(v).strip() != "") >= 3: h_idx = i; break
-        df.columns = df.iloc[h_idx]; df = df.iloc[h_idx+1:].reset_index(drop=True)
-        cols = [str(c).strip() for c in df.columns]
+        try:
+            if uploaded_file.name.endswith('.csv'):
+                try: df = pd.read_csv(uploaded_file, na_filter=False, dtype=str, header=None, encoding='utf-8')
+                except: df = pd.read_csv(uploaded_file, na_filter=False, dtype=str, header=None, encoding='cp932')
+            else:
+                # 🌟 マルチシート対応：全シート名を読み込む
+                xl = pd.ExcelFile(uploaded_file)
+                sheet_names = xl.sheet_names
+                if len(sheet_names) > 1:
+                    selected_sheet = st.selectbox("読み込むシートを選択してください", sheet_names)
+                else:
+                    selected_sheet = sheet_names[0]
+                df = pd.read_excel(uploaded_file, sheet_name=selected_sheet, na_filter=False, dtype=str, header=None)
 
-        with st.expander("📋 列の紐付け確認", expanded=True):
-            c1, c2, c3 = st.columns(3)
-            art_c = c1.selectbox("品番 (Article)", cols, index=guess_column_index(cols, ['art', 'code']))
-            name_c = c2.selectbox("商品名称 (Name)", cols, index=guess_column_index(cols, ['名称', 'name']))
-            bs_c = c3.selectbox("BS (カテゴリー)", cols, index=guess_column_index(cols, ['BS'], exclude=['size', 'サイズ']))
-            size_c = c1.selectbox("サイズ (Size)", cols, index=guess_column_index(cols, ['size', 'サイズ']))
-            qty_c = c2.selectbox("数量 (Qty)", cols, index=guess_column_index(cols, ['qty', '数量']))
-            status_c = c3.selectbox("ステータス (Status)", cols, index=min(11, len(cols)-1))
+            # ヘッダー検知
+            h_idx = 0
+            for i, row in df.iterrows():
+                if sum(1 for v in row if str(v).strip() != "") >= 3: h_idx = i; break
+            df.columns = df.iloc[h_idx]; df = df.iloc[h_idx+1:].reset_index(drop=True)
+            cols = [str(c).strip() for c in df.columns]
 
-        if st.button("カタログ作成開始", type="primary", use_container_width=True):
-            results = []
-            progress = st.progress(0)
-            target_df = df[df[art_c].notnull()].drop_duplicates(subset=[art_c])
-            with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as exe:
-                futures = {exe.submit(get_best_image, row[art_c], row[name_c]): row for _, row in target_df.iterrows()}
-                for i, f in enumerate(concurrent.futures.as_completed(futures)):
-                    row, img = futures[f], f.result()
-                    results.append({
-                        "code": str(row[art_c]).strip(), "name": str(row[name_c]).strip(),
-                        "bs": str(row[bs_c]).strip(), "size": str(row[size_c]).strip(),
-                        "qty": str(row[qty_c]).strip(), "status": str(row[status_c]).strip(),
-                        "auto_url": img["url"] if img else "", "manual_url": ""
-                    })
-                    progress.progress((i + 1) / len(target_df))
-            st.session_state.catalog_items = results
-            st.session_state.generated = True
-            save_auto_save_data(results)
-            st.rerun()
+            with st.expander("📋 列の紐付け確認", expanded=True):
+                c1, c2, c3 = st.columns(3)
+                art_c = c1.selectbox("品番 (Article)", cols, index=guess_column_index(cols, ['art', 'code']))
+                name_c = c2.selectbox("商品名称 (Name)", cols, index=guess_column_index(cols, ['名称', 'name']))
+                bs_c = c3.selectbox("BS (カテゴリー)", cols, index=guess_column_index(cols, ['BS'], exclude=['size', 'サイズ']))
+                size_c = c1.selectbox("サイズ (Size)", cols, index=guess_column_index(cols, ['size', 'サイズ']))
+                qty_c = c2.selectbox("数量 (Qty)", cols, index=guess_column_index(cols, ['qty', '数量']))
+                status_c = c3.selectbox("ステータス (Status)", cols, index=min(11, len(cols)-1)) # 列12デフォルト
+
+            if st.button("カタログ作成開始", type="primary", use_container_width=True):
+                results = []
+                progress = st.progress(0)
+                target_df = df[df[art_c].notnull()].drop_duplicates(subset=[art_c])
+                with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as exe:
+                    futures = {exe.submit(get_best_image, row[art_c], row[name_c]): row for _, row in target_df.iterrows()}
+                    for i, f in enumerate(concurrent.futures.as_completed(futures)):
+                        row, img = futures[f], f.result()
+                        results.append({
+                            "code": str(row[art_c]).strip(), "name": str(row[name_c]).strip(),
+                            "bs": str(row[bs_c]).strip(), "size": str(row[size_c]).strip(),
+                            "qty": str(row[qty_c]).strip(), "status": str(row[status_c]).strip(),
+                            "auto_url": img["url"] if img else "", "manual_url": ""
+                        })
+                        progress.progress((i + 1) / len(target_df))
+                st.session_state.catalog_items = results
+                st.session_state.generated = True
+                save_auto_save_data(results)
+                st.rerun()
+        except Exception as e:
+            st.error(f"エラーが発生しました: {e}")
 
 # --- 📊 メイン表示 ---
 if st.session_state.generated:
@@ -211,7 +240,7 @@ if st.session_state.generated:
     if is_new_only:
         display = [i for i in display if str(i.get("status", "")).upper() in ["#N/A", "#REF!", "NAN", "", "NEW"]]
 
-    # 品番/合計表示
+    # 総数表示
     total_q = sum([float(str(i.get("qty", "0")).replace(',','')) if str(i.get("qty", "0")).replace('.','',1).isdigit() else 0 for i in display])
     st.info(f"📊 **{len(display)}** 品番 / 合計 **{int(total_q)}** 点 を表示中")
 
@@ -222,7 +251,7 @@ if st.session_state.generated:
     qr_html = f'<div style="text-align:center;"><div id="qrcode" style="display:inline-block;background:white;padding:10px;border-radius:8px;"></div></div><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script><script>new QRCode(document.getElementById("qrcode"), {{text:window.parent.location.href.split("?")[0]+"?sid={sid}", width:120, height:120}});</script>'
     components.html(qr_html, height=150)
 
-    # カタログ本体
+    # カタログ本体（標準3列 / コンパクト5列）
     n_cols = 5 if is_print_mode else 3
     img_h = "140px" if is_print_mode else "200px"
 
@@ -238,7 +267,6 @@ if st.session_state.generated:
                 else: st.markdown(f'<div class="product-image-container" style="height:{img_h}; background:#f8f9fa;"><div style="color:#999; font-size:0.8rem;">画像なし</div></div>', unsafe_allow_html=True)
                 
                 if not is_print_mode:
-                    # 🌟 復旧：Google画像検索リンク
                     st.markdown(f"🔍 [Google検索](https://www.google.com/search?tbm=isch&q=adidas+{item['code']})")
                     new_u = st.text_input("URL貼付", value=item["manual_url"], key=f"inp_{item['code']}")
                     if new_u != item["manual_url"]:
