@@ -83,16 +83,28 @@ st.markdown("""
         text-shadow: 1px 1px 3px rgba(0,0,0,1.0);
     }
 
-    /* 🌟 Streamlit標準パーツの制御（メニューボタンを救出） */
-    header {visibility: hidden;}
+    /* 🌟 UIの修正ポイント：黒い帯を消し、ボタンだけを救出する */
     footer {visibility: hidden;}
     [data-testid="stDecoration"] {display: none;}
     
+    /* 黒い帯（ヘッダー全体）の背景を完全に透明にする */
     [data-testid="stHeader"] {
-        background-color: rgba(14, 17, 23, 0.8) !important;
-        visibility: visible !important;
+        background-color: transparent !important;
     }
-    [data-testid="stToolbar"] { display: none !important; }
+    
+    /* 右上の余計なメニュー（Share等）を非表示にする */
+    [data-testid="stToolbar"] { 
+        display: none !important; 
+    }
+    
+    /* 閉じた状態のサイドバーを開くボタン（ハンバーガー）を強制的に表示・装飾 */
+    [data-testid="collapsedControl"] {
+        visibility: visible !important;
+        color: #ffffff !important;
+        background-color: rgba(255,255,255,0.15) !important;
+        border-radius: 8px !important;
+        z-index: 999999 !important; /* 確実に最前面へ */
+    }
 
     /* ==========================================
        📱 モバイル表示（スマホ）の2列強制・絶対命令
@@ -185,7 +197,7 @@ def generate_html_report(items):
     html_content += f"</div><p style='text-align:center;font-size:0.6rem;'>出力:{now_str}</p></body></html>"
     return html_content
 
-# --- 🔍 検索ロジック（オリジナルの正確な動作に完全準拠） ---
+# --- 🔍 検索ロジック（完全に固定・変更なし） ---
 def is_valid_adidas_img(url):
     keywords = ["adidas", "yimg", "bing", "gstatic", "shop-adidas", "mm-adidas"]
     return any(k in url.lower() for k in keywords)
@@ -306,7 +318,7 @@ if not st.session_state.generated:
     uploaded_file = st.file_uploader("Excel/CSVをアップロード", type=['xlsx', 'xlsm', 'csv'])
     if uploaded_file:
         try:
-            # 🌟 複数シート対応ロジックの追加
+            # 複数シート対応ロジック
             if uploaded_file.name.endswith('.csv'):
                 try: df = pd.read_csv(uploaded_file, na_filter=False, dtype=str, header=None, encoding='utf-8')
                 except: df = pd.read_csv(uploaded_file, na_filter=False, dtype=str, header=None, encoding='cp932')
@@ -336,7 +348,6 @@ if not st.session_state.generated:
                     code_col = st.selectbox("Article", columns, index=guess_column_index(columns, ['material number', 'artno', 'article', 'art', 'code', '品番']))
                     size_col = st.selectbox("Size", ["(なし)"] + columns, index=guess_column_index(columns, ['size description', 'size', 'サイズ'])+1)
                 with c2:
-                    # 🌟 「店舗名称」の誤爆を回避
                     name_col = st.selectbox("Name", columns, index=guess_column_index(columns, ['商品名称', '名称', 'name', 'item', 'description'], exclude=['size', 'サイズ', '店舗', 'store']))
                     qty_col = st.selectbox("Qty", ["(なし)"] + columns, index=guess_column_index(columns, ['qty', '数量'], exclude=['inv qty'])+1)
                 with c3:
@@ -346,7 +357,7 @@ if not st.session_state.generated:
             if st.button("カタログ作成開始", type="primary", use_container_width=True):
                 display_df = df[df[code_col].astype(str).str.strip() != ""]
                 
-                # 🌟 オリジナルの集計ロジック（サイズと数量を合算）を完全復旧
+                # 集計ロジック（サイズと数量を合算）
                 agg_sizes, agg_qtys = {}, {}
                 for code, group in display_df.groupby(code_col):
                     code_str = str(code).strip()
