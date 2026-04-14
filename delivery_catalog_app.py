@@ -22,17 +22,16 @@ def get_shared_store():
 st.set_page_config(page_title="商品画像見える君", layout="wide")
 
 # ==========================================
-# 🎨 究極の視認性・モバイル2列強制（背景色修正済み）
+# 🎨 究極の視認性・スマホ1列リスト強制デザイン
 # ==========================================
 st.markdown("""
     <style>
-    /* 🌟 全体の背景をダークモードに固定（白文字をハッキリ見せるため） */
+    /* 🌟 全体の背景をダークモードに固定 */
     html, body, [data-testid="stAppViewContainer"], .stApp {
         background-color: #0e1117 !important;
         color: #ffffff !important;
     }
 
-    /* 1. タイトルの視認性 */
     .main-title {
         font-size: 2.8rem !important;
         font-weight: 900 !important;
@@ -45,7 +44,17 @@ st.markdown("""
         padding-left: 20px;
     }
 
-    /* 2. 商品名称の視認性 */
+    /* 🌟 新設：カード全体と情報エリアのラッパー */
+    .product-card {
+        display: flex;
+        flex-direction: column; /* PCデフォルトは縦並び */
+        height: 100%;
+    }
+    .product-info {
+        display: flex;
+        flex-direction: column;
+    }
+
     .product-title {
         font-weight: 800;
         font-size: 1.0rem;
@@ -57,7 +66,6 @@ st.markdown("""
         text-shadow: 2px 2px 5px rgba(0,0,0,1.0) !important;
     }
 
-    /* 3. 画像コンテナ */
     .product-image-container {
         display: flex;
         justify-content: center;
@@ -88,12 +96,11 @@ st.markdown("""
         text-shadow: 1px 1px 3px rgba(0,0,0,1.0);
     }
 
-    /* 余計な表示だけ消す（ヘッダーとボタンはいじらない） */
     footer {visibility: hidden;}
     [data-testid="stDecoration"] {display: none;}
 
     /* ==========================================
-       📱 モバイル表示（スマホ）の2列強制・絶対命令
+       📱 モバイル表示（スマホ）の1列リスト化・完全最適化
        ========================================== */
     @media screen and (max-width: 800px) {
         .main-title {
@@ -103,39 +110,59 @@ st.markdown("""
             margin-top: 1rem !important;
         }
 
+        /* 1カラム（縦1列）リストに強制 */
         div[data-testid="stHorizontalBlock"] {
             display: flex !important;
-            flex-direction: row !important;
-            flex-wrap: wrap !important;
-            width: 100% !important;
+            flex-direction: column !important; 
             gap: 0 !important;
         }
 
         div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
-            width: 50% !important;
-            flex: 0 0 50% !important;
-            min-width: 50% !important;
-            max-width: 50% !important;
-            padding: 8px !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            padding: 12px 0 !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1); /* リストの区切り線 */
+        }
+
+        /* 🌟 画像左・テキスト右の横並びレイアウトに変更 */
+        .product-card {
+            flex-direction: row !important;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .product-image-container {
+            width: 80px !important;
+            height: 80px !important; /* 強制的に正方形のサムネイル化 */
+            min-width: 80px;
+            margin-bottom: 0 !important;
+            margin-right: 15px;
+            border-radius: 6px;
+            box-shadow: none !important; /* フラットデザインに */
+        }
+
+        .product-info {
+            flex-grow: 1;
+            overflow: hidden; /* テキストのはみ出し防止 */
         }
 
         .product-title {
-            font-size: 0.85rem !important;
-            height: 2.4em !important;
-            margin-bottom: 2px;
-        }
-        .product-details {
-            font-size: 0.65rem !important;
-            height: 3.9em !important;
+            font-size: 1.0rem !important;
+            height: auto !important;
+            white-space: nowrap; /* 商品名を1行に制限 */
+            text-overflow: ellipsis; /* 長い場合は「...」に */
             margin-bottom: 4px;
         }
-        
-        .product-image-container {
-            height: 150px !important;
+
+        .product-details {
+            font-size: 0.75rem !important;
+            height: auto !important;
+            text-shadow: none !important;
+            color: #bbb !important;
         }
     }
 
-    /* 4. 印刷用設定 */
+    /* 4. 印刷用設定（変更なし） */
     @media print {
         header, [data-testid="stSidebar"], [data-testid="stToolbar"], 
         .stButton, .stDownloadButton, [data-testid="stExpander"],
@@ -151,7 +178,8 @@ st.markdown("""
         body, html, [data-testid="stAppViewContainer"], .stApp { background-color: white !important; }
         .product-title { color: #000 !important; text-shadow: none !important; font-size: 0.85rem; }
         .product-details { color: #333 !important; text-shadow: none !important; font-size: 0.65rem; }
-        .product-image-container { border: 1px solid #eee; box-shadow: none; }
+        .product-image-container { border: 1px solid #aaa !important; box-shadow: none !important; }
+        .product-image-container img { filter: none !important; }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -384,7 +412,6 @@ if not st.session_state.generated:
         except Exception as e: st.error(f"エラー: {e}")
 
 if st.session_state.generated:
-    # --- 絞り込みロジックの適用 ---
     items = st.session_state.catalog_items
     filtered = items
     
@@ -394,7 +421,6 @@ if st.session_state.generated:
     if is_new_only:
         filtered = [i for i in filtered if str(i.get("status", "")).strip().upper() in ["#N/A", "#REF!", "NAN", ""]]
 
-    # --- UI表示 ---
     total_q = sum([float(i.get("qty",0)) if i.get("qty") else 0 for i in filtered])
     
     if not is_print_mode:
@@ -402,7 +428,6 @@ if st.session_state.generated:
     else:
         st.caption(f"【コンパクトモード】 {len(filtered)} 品番 / {int(total_q)} 点")
 
-    # コンパクトモードでも常にQRコードとHTML保存を表示
     st.markdown("<h3 class='no-print'>📱 スマホ転送・出力</h3>", unsafe_allow_html=True)
     btn1, btn2 = st.columns(2)
     with btn1:
@@ -413,25 +438,35 @@ if st.session_state.generated:
         qr_html = f'<div style="display:flex; justify-content:center;"><div id="qrcode" style="background:white;padding:10px;border-radius:8px;"></div></div><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script><script>var url = window.parent.location.href.split("?")[0] + "?sid={sid}"; new QRCode(document.getElementById("qrcode"), {{text:url, width:120, height:120}});</script>'
         components.html(qr_html, height=150)
 
-    # --- カタログ本体 ---
     num_cols = 5 if is_print_mode else 3
     img_h = "140px" if is_print_mode else "260px"
     for i in range(0, len(filtered), num_cols):
         cols = st.columns(num_cols) 
         for j, item in enumerate(filtered[i:i+num_cols]):
             with cols[j]:
-                st.markdown(f'<div class="product-title">{item["name"]}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="product-details">Art: {item["code"]}<br>Size: {item["size"]}<br>Qty: {item.get("qty","0")}点 / {item["status"]}</div>', unsafe_allow_html=True)
-                
                 url = item.get("manual_url") or item.get("auto_url")
-                if url: st.markdown(f'<div class="product-image-container" style="height:{img_h};"><img src="{url}"></div>', unsafe_allow_html=True)
-                else: st.markdown(f'<div class="product-image-container" style="height:{img_h}; background:#f8f9fa;"><div style="color:#999; font-size:0.8rem;">画像なし</div></div>', unsafe_allow_html=True)
+                img_tag = f'<img src="{url}">' if url else '<div style="color:#999; font-size:0.8rem;">画像なし</div>'
                 
+                # 🌟 新設：写真のようなレイアウトを実現するため、1つのカードHTMLに統合
+                html_card = f"""
+                <div class="product-card">
+                    <div class="product-image-container" style="height:{img_h};">
+                        {img_tag}
+                    </div>
+                    <div class="product-info">
+                        <div class="product-title">{item["name"]}</div>
+                        <div class="product-details">Art: {item["code"]}<br>Size: {item["size"]}<br>Qty: {item.get("qty","0")}点 / {item["status"]}</div>
+                    </div>
+                </div>
+                """
+                st.markdown(html_card, unsafe_allow_html=True)
+                
+                # 🌟 新設：リストをスッキリさせるため、編集・検索欄をアコーディオンに収納
                 if not is_print_mode:
-                    st.markdown(f"🔍 [Google検索](https://www.google.com/search?tbm=isch&q=adidas+{item['code']})")
-                    new_u = st.text_input("URL貼付", value=item.get("manual_url", ""), key=f"inp_{item['code']}")
-                    if new_u != item.get("manual_url"):
-                        item["manual_url"] = new_u
-                        save_auto_save_data(st.session_state.catalog_items)
-                        st.rerun()
-                    st.write("---")
+                    with st.expander("🔍 画像変更・検索", expanded=False):
+                        st.markdown(f"<div class='no-print'><a href='https://www.google.com/search?tbm=isch&q=adidas+{item['code']}' target='_blank'>Google画像検索</a></div>", unsafe_allow_html=True)
+                        new_u = st.text_input("URL貼付", value=item.get("manual_url", ""), key=f"inp_{item['code']}")
+                        if new_u != item.get("manual_url"):
+                            item["manual_url"] = new_u
+                            save_auto_save_data(st.session_state.catalog_items)
+                            st.rerun()
