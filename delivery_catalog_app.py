@@ -36,6 +36,7 @@ st.markdown("""
         background-color: rgba(14, 17, 23, 0.8) !important;
         visibility: visible !important;
     }
+    [data-testid="stToolbar"] { display: none !important; }
 
     /* 2. 文字の視認性 */
     .main-title {
@@ -61,6 +62,9 @@ st.markdown("""
         overflow: hidden; margin-bottom: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.6);
     }
     .product-image-container img { max-height: 100%; max-width: 100%; object-fit: contain; }
+
+    footer {visibility: hidden;}
+    [data-testid="stDecoration"] {display: none;}
 
     /* 📱 スマホ表示：2列強制（iPhone Edge/Safari対応） */
     @media screen and (max-width: 800px) {
@@ -88,7 +92,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 🔍 高精度・検索ロジック ---
+# --- 🔍 ヘルパー関数 ---
 def guess_column_index(columns, keywords, default_idx=0, exclude=[]):
     for keyword in keywords:
         for idx, col in enumerate(columns):
@@ -97,48 +101,16 @@ def guess_column_index(columns, keywords, default_idx=0, exclude=[]):
                 return idx
     return default_idx
 
+# 🌟 ユーザーのオリジナルコード（最も正確なロジック）に完全復元
 def get_best_image(code, name=""):
     code_str = str(code).strip().upper()
-    
-    # 🌟 1. 楽天API (商品名に品番が完全一致する場合のみ採用)
     try:
         url = "https://app.rakuten.co.jp/services/api/IchibaItem/Search/20220601"
-        res = requests.get(url, params={"applicationId": RAKUTEN_APP_ID, "keyword": f"adidas {code_str}", "hits": 3}, timeout=3)
+        res = requests.get(url, params={"applicationId": RAKUTEN_APP_ID, "keyword": f"adidas {code_str}", "hits": 1}, timeout=3)
         if res.status_code == 200:
             items = res.json().get("Items", [])
-            for item in items:
-                item_name = item["Item"].get("itemName", "").upper()
-                if code_str in item_name: 
-                    return {"url": item["Item"]["mediumImageUrls"][0]["imageUrl"].split("?_ex=")[0]}
+            if items: return {"url": items[0]["Item"]["mediumImageUrls"][0]["imageUrl"].split("?_ex=")[0]}
     except: pass
-
-    # 🌟 2. Bing画像検索 (画像の「タイトル」を検証するロジック)
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-    try:
-        query = f"adidas {code_str}"
-        bing_url = f"https://www.bing.com/images/search?q={query}"
-        res = requests.get(bing_url, headers=headers, timeout=5)
-        soup = BeautifulSoup(res.text, 'html.parser')
-        
-        for a in soup.find_all('a', class_='iusc'):
-            m_str = a.get('m')
-            if m_str:
-                m_data = json.loads(m_str)
-                murl = m_data.get('murl', '')
-                title = m_data.get('t', '').upper()
-                
-                if not murl: continue
-                
-                if code_str in title or "ADIDAS" in title or "アディダス" in title:
-                    return {"url": murl}
-                    
-        for a in soup.find_all('a', class_='iusc'):
-            m_str = a.get('m')
-            if m_str:
-                murl = json.loads(m_str).get('murl')
-                if murl: return {"url": murl}
-    except: pass
-
     return None
 
 def save_auto_save_data(items):
@@ -164,7 +136,7 @@ if "catalog_items" not in st.session_state:
 
 with st.sidebar:
     st.header("⚙️ 管理メニュー")
-    concurrency = st.slider("⚡ 検索スピード", 1, 10, 3)
+    concurrency = st.slider("⚡ 検索スピード", 1, 10, 5)
     is_print_mode = st.toggle("コンパクトモード (5列)", value=False)
     
     if st.button("🖨️ 印刷する", use_container_width=True, type="primary"):
@@ -239,14 +211,11 @@ if not st.session_state.generated:
                 seen.add(new_c)
             df.columns = cols
 
-            # 🌟 修正ポイント：店舗名称を排除し、正しい商品名称を優先取得する
+            # 🌟 列の自動紐付け（店舗名称の誤爆を排除済み）
             with st.expander("📋 列の紐付け確認", expanded=True):
                 c1, c2, c3 = st.columns(3)
                 art_c = c1.selectbox("品番 (Article)", cols, index=guess_column_index(cols, ['material number', 'art', 'code', '品番']))
-                
-                # '店舗' や 'store' を除外し、'商品名称' などを優先
                 name_c = c2.selectbox("商品名称 (Name)", cols, index=guess_column_index(cols, ['商品名称', '商品名', 'article description', 'description', 'name', '名称'], exclude=['size', 'サイズ', '店舗', 'store']))
-                
                 bs_c = c3.selectbox("BS (カテゴリー)", cols, index=guess_column_index(cols, ['bs', 'category', '部門'], exclude=['size', 'サイズ']))
                 size_c = c1.selectbox("サイズ (Size)", cols, index=guess_column_index(cols, ['size description', 'size', 'サイズ']))
                 qty_c = c2.selectbox("数量 (Qty)", cols, index=guess_column_index(cols, ['qty', '数量'], exclude=['inv qty']))
@@ -255,7 +224,6 @@ if not st.session_state.generated:
             if st.button("カタログ作成開始", type="primary", use_container_width=True):
                 results = []
                 progress = st.progress(0)
-                # 空白や欠損の品番を除外
                 target_df = df[df[art_c].notnull() & (df[art_c] != "") & (df[art_c].str.lower() != "nan")].drop_duplicates(subset=[art_c])
                 with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as exe:
                     futures = {exe.submit(get_best_image, row[art_c], row[name_c]): row for _, row in target_df.iterrows()}
