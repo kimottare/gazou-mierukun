@@ -285,7 +285,6 @@ def get_rakuten_images(code, limit=3):
             items = res.json().get("Items", [])
             for item in items:
                 if str(code).strip().lower() in item["Item"].get("itemName", "").lower():
-                    # 複数画像を持っている場合も取得
                     img_urls = item["Item"].get("mediumImageUrls", [])
                     for img in img_urls:
                         img_url = img["imageUrl"].split("?_ex=")[0]
@@ -302,7 +301,6 @@ def get_best_images(code, name=""):
     r_urls = get_rakuten_images(code_str, limit=3)
     b_urls = scrape_bing_high_res_images(query, code_str, limit=5)
     
-    # 楽天の画像を優先して結合・重複排除
     combined = []
     for u in r_urls:
         if u not in combined: combined.append(u)
@@ -476,7 +474,6 @@ if not st.session_state.generated:
                         code, name = str(row[code_col]).strip(), str(row[name_col]).strip()
                         if not code or code.lower() in ['nan', 'none']: return idx, None
                         
-                        # ★ 複数候補の取得
                         urls = get_best_images(code, name)
                         top_url = urls[0] if urls else None
                         
@@ -506,7 +503,6 @@ if not st.session_state.generated:
                         code, name = str(row[code_col]).strip(), str(row[name_col]).strip()
                         if not code or code.lower() in ['nan', 'none']: return idx, None
                         
-                        # ★ 複数候補の取得
                         urls = get_best_images(code, name)
                         top_url = urls[0] if urls else None
                         
@@ -579,31 +575,35 @@ if st.session_state.generated:
                 html_card = f'<div class="product-card"><div class="product-image-container" style="height:{img_h};">{img_tag}</div><div class="product-info"><div class="product-title">{item["name"]}</div><div class="product-details">{details_html}</div></div></div>'
                 st.markdown(html_card, unsafe_allow_html=True)
                 
-                # 🌟 【新機能】候補から選ぶアコーディオン UI
+                # 🌟 【UI改善】 候補画像選択エリア
                 if not is_print_mode:
                     with st.expander("🔍 画像変更・検索", expanded=False):
-                        candidates = item.get("auto_urls", [])
                         
-                        if candidates and len(candidates) > 1:
-                            st.markdown("<div style='font-size:0.75rem; color:#aaa; margin-bottom:4px;'>▼ 候補から選ぶ（左右スクロール）</div>", unsafe_allow_html=True)
-                            
-                            # 横スクロール可能なサムネイルコンテナ
-                            cand_html = "<div style='display:flex; overflow-x:auto; gap:8px; padding-bottom:8px;'>"
-                            for c_idx, c_url in enumerate(candidates):
-                                cand_html += f"<div style='flex-shrink:0; text-align:center;'><img src='{c_url}' style='height:80px; width:80px; object-fit:contain; background:#fff; border-radius:4px; border:1px solid #555;'><div style='font-size:0.75rem; margin-top:2px;'>No.{c_idx+1}</div></div>"
-                            cand_html += "</div>"
-                            st.markdown(cand_html, unsafe_allow_html=True)
-                            
-                            # 番号選択用のラジオボタンと確定ボタン
-                            c1, c2 = st.columns([2, 1])
-                            with c1:
-                                sel_idx = st.radio("番号", options=range(1, len(candidates)+1), horizontal=True, label_visibility="collapsed", key=f"rad_{item['code']}")
-                            with c2:
-                                if st.button("✓ 変更", key=f"btn_apply_{item['code']}", use_container_width=True):
-                                    item["manual_url"] = candidates[sel_idx - 1]
-                                    save_auto_save_data(st.session_state.catalog_items)
-                                    st.rerun()
-                            st.write("---")
+                        # データが古い場合のアラート
+                        if "auto_urls" not in item:
+                            st.warning("⚠️ 過去のデータです。候補画像機能を使うには、サイドバーの「🗑️ リセット」を押してリストを再作成してください。")
+                        else:
+                            candidates = item.get("auto_urls", [])
+                            if candidates:
+                                st.markdown("<div style='font-size:0.75rem; color:#aaa; margin-bottom:4px;'>▼ 候補から選ぶ（左右スクロール）</div>", unsafe_allow_html=True)
+                                
+                                cand_html = "<div style='display:flex; overflow-x:auto; gap:8px; padding-bottom:8px;'>"
+                                for c_idx, c_url in enumerate(candidates):
+                                    cand_html += f"<div style='flex-shrink:0; text-align:center;'><img src='{c_url}' style='height:80px; width:80px; object-fit:contain; background:#fff; border-radius:4px; border:1px solid #555;'><div style='font-size:0.75rem; margin-top:2px;'>No.{c_idx+1}</div></div>"
+                                cand_html += "</div>"
+                                st.markdown(cand_html, unsafe_allow_html=True)
+                                
+                                c1, c2 = st.columns([2, 1])
+                                with c1:
+                                    sel_idx = st.radio("番号", options=range(1, len(candidates)+1), horizontal=True, label_visibility="collapsed", key=f"rad_{item['code']}")
+                                with c2:
+                                    if st.button("✓ 変更", key=f"btn_apply_{item['code']}", use_container_width=True):
+                                        item["manual_url"] = candidates[sel_idx - 1]
+                                        save_auto_save_data(st.session_state.catalog_items)
+                                        st.rerun()
+                                st.write("---")
+                            else:
+                                st.info("💡 他の候補画像が見つかりませんでした。")
 
                         st.markdown(f"<div class='no-print' style='margin-bottom:8px;'><a href='https://www.google.com/search?tbm=isch&q=adidas+{item['code']}' target='_blank'>🌐 Google画像検索を開く</a></div>", unsafe_allow_html=True)
                         new_u = st.text_input("URLを手動貼付", value=item.get("manual_url", ""), key=f"inp_{item['code']}")
