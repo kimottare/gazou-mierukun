@@ -239,7 +239,7 @@ def confirm_reset():
 
 def generate_html_report(items):
     now_str = datetime.datetime.now().strftime("%Y年%m月%d日 %H:%M")
-    html_content = f"""<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>カタログ出力</title><style>body{{font-family:sans-serif;background:#fff;padding:20px;}} .grid{{display:grid;grid-template-columns:repeat(5, 1fr);gap:10px;}} .card{{border:1px solid #eee;padding:10px;border-radius:5px;break-inside:avoid;}} .img-box{{height:150px;display:flex;justify-content:center;align-items:center;}} img{{max-height:100%;max-width:100%;object-fit:contain;}} .t{{font-weight:bold;font-size:0.8rem;margin:5px 0;}} .d{{font-size:0.65rem;color:#666;}}</style></head><body><h3>📦 商品カタログ ({len(items)}件)</h3><div class="grid">"""
+    html_content = f"""<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>カタログ出力</title><style>body{{font-family:sans-serif;background:#fff;padding:20px;}} .grid{{display:grid;grid-template-columns:repeat(5, 1fr);gap:10px;}} .card{{border:1px solid #eee;padding:10px;border-radius:5px;break-inside:avoid;}} .img-box{{height:150px;display:flex;justify(content):center;align-items:center;}} img{{max-height:100%;max-width:100%;object-fit:contain;}} .t{{font-weight:bold;font-size:0.8rem;margin:5px 0;}} .d{{font-size:0.65rem;color:#666;}}</style></head><body><h3>📦 商品カタログ ({len(items)}件)</h3><div class="grid">"""
     for item in items:
         u = item.get("manual_url") or item.get("auto_url") or ""
         if item.get("mode") == "MKD":
@@ -251,7 +251,7 @@ def generate_html_report(items):
     html_content += f"</div><p style='text-align:center;font-size:0.6rem;'>出力:{now_str}</p></body></html>"
     return html_content
 
-# --- 🔍 究極の検索ロジック（複数候補取得機能） ---
+# --- 🔍 究極の検索ロジック ---
 def is_valid_adidas_img(url):
     keywords = ["adidas", "yimg", "bing", "gstatic", "shop-adidas", "mm-adidas"]
     return any(k in url.lower() for k in keywords)
@@ -307,7 +307,7 @@ def get_best_images(code, name=""):
     for u in b_urls:
         if u not in combined: combined.append(u)
         
-    return combined[:5] # 最大5枚の候補を返す
+    return combined[:5]
 
 def guess_column_index(columns, keywords, default_idx=0, exclude=[]):
     for keyword in keywords:
@@ -361,6 +361,7 @@ with st.sidebar:
     
     if st.session_state.generated:
         st.subheader("🎯 絞り込み")
+        # 🌟 ひとつ前の仕様に基づき復活
         is_new_only = st.checkbox("✨ 新規入荷のみ (入荷リスト用)", key="new_only_toggle")
 
         items = st.session_state.catalog_items
@@ -419,8 +420,9 @@ if not st.session_state.generated:
                         name_col = st.selectbox("Name", columns, index=guess_column_index(columns, ['商品名称', '名称', 'name', 'item', 'description'], exclude=['size', 'サイズ', '店舗', 'store']))
                         qty_col = st.selectbox("Qty", ["(なし)"] + columns, index=guess_column_index(columns, ['qty', '数量'], exclude=['inv qty'])+1)
                     with c3:
-                        bs_col = st.selectbox("BS", ["(なし)"] + columns, index=guess_column_index(columns, ['bs', 'category'], exclude=['size', 'サイズ'])+1)
-                        status_col = st.selectbox("Status", ["(なし)"] + columns, index=guess_column_index(columns, ['inv qty', 'status', 'ステータス'], default_idx=len(columns)-1)+1)
+                        # 🌟 BSの自動検出が失敗した場合、デフォルトで「(なし)」を選ぶように修正 (default_idx=-1)
+                        bs_col = st.selectbox("BS (カテゴリー)", ["(なし)"] + columns, index=guess_column_index(columns, ['bs', 'category'], exclude=['size', 'サイズ', 'j/'], default_idx=-1)+1)
+                        status_col = st.selectbox("Status", ["(なし)"] + columns, index=guess_column_index(columns, ['inv qty', 'status', 'ステータス'], default_idx=-1)+1)
 
             elif list_mode == "MKDリスト":
                 if uploaded_file.name.endswith('.csv'):
@@ -446,7 +448,8 @@ if not st.session_state.generated:
                     with c3:
                         qty_col = st.selectbox("数量", columns, index=guess_column_index(columns, ['inv qty', 'qty']))
                         date_col = st.selectbox("MKD/MKU Start Date", columns, index=guess_column_index(columns, ['mkd/mku start date', 'date']))
-                        bs_col = st.selectbox("カテゴリー (絞り込み用)", ["(なし)"] + columns, index=guess_column_index(columns, ['business segment', 'bs'])+1)
+                        # 🌟 こちらもBSを「(なし)」デフォルトに修正
+                        bs_col = st.selectbox("BS (カテゴリー)", ["(なし)"] + columns, index=guess_column_index(columns, ['business segment', 'bs'], exclude=['size', 'サイズ', 'j/'], default_idx=-1)+1)
 
             if st.button("カタログ作成開始", type="primary", use_container_width=True):
                 display_df = df[df[code_col].astype(str).str.strip() != ""]
@@ -473,10 +476,8 @@ if not st.session_state.generated:
                         idx, row = args
                         code, name = str(row[code_col]).strip(), str(row[name_col]).strip()
                         if not code or code.lower() in ['nan', 'none']: return idx, None
-                        
                         urls = get_best_images(code, name)
                         top_url = urls[0] if urls else None
-                        
                         return idx, {"mode": "入荷", "code": code, "name": name, "bs": str(row[bs_col]) if bs_col != "(なし)" else "",
                                    "size": agg_sizes.get(code, ""), "qty": agg_qtys.get(code, ""),
                                    "status": str(row[status_col]) if status_col != "(なし)" else "",
@@ -502,10 +503,8 @@ if not st.session_state.generated:
                         idx, row = args
                         code, name = str(row[code_col]).strip(), str(row[name_col]).strip()
                         if not code or code.lower() in ['nan', 'none']: return idx, None
-                        
                         urls = get_best_images(code, name)
                         top_url = urls[0] if urls else None
-                        
                         return idx, {"mode": "MKD", "code": code, "name": name, "bs": str(row[bs_col]) if bs_col != "(なし)" else "",
                                    "price": str(row[price_col]), "gender": str(row[gender_col]), "date": str(row[date_col]),
                                    "qty": agg_qtys.get(code, "0"),
@@ -560,7 +559,6 @@ if st.session_state.generated:
             with cols[j]:
                 url = item.get("manual_url") or item.get("auto_url")
                 
-                # 🌟 画像ライトボックス用のタグ
                 if url:
                     img_id = f"img_modal_{i}_{j}"
                     img_tag = f'<label for="{img_id}"><img src="{url}"></label><input type="checkbox" id="{img_id}" class="lightbox-toggle"><div class="lightbox"><label for="{img_id}" class="lightbox-close-area"></label><img src="{url}"></div>'
@@ -575,24 +573,19 @@ if st.session_state.generated:
                 html_card = f'<div class="product-card"><div class="product-image-container" style="height:{img_h};">{img_tag}</div><div class="product-info"><div class="product-title">{item["name"]}</div><div class="product-details">{details_html}</div></div></div>'
                 st.markdown(html_card, unsafe_allow_html=True)
                 
-                # 🌟 【UI改善】 候補画像選択エリア
                 if not is_print_mode:
                     with st.expander("🔍 画像変更・検索", expanded=False):
-                        
-                        # データが古い場合のアラート
                         if "auto_urls" not in item:
-                            st.warning("⚠️ 過去のデータです。候補画像機能を使うには、サイドバーの「🗑️ リセット」を押してリストを再作成してください。")
+                            st.warning("⚠️ 過去のデータです。候補画像機能を使うには、リセットしてリストを再作成してください。")
                         else:
                             candidates = item.get("auto_urls", [])
                             if candidates:
                                 st.markdown("<div style='font-size:0.75rem; color:#aaa; margin-bottom:4px;'>▼ 候補から選ぶ（左右スクロール）</div>", unsafe_allow_html=True)
-                                
                                 cand_html = "<div style='display:flex; overflow-x:auto; gap:8px; padding-bottom:8px;'>"
                                 for c_idx, c_url in enumerate(candidates):
                                     cand_html += f"<div style='flex-shrink:0; text-align:center;'><img src='{c_url}' style='height:80px; width:80px; object-fit:contain; background:#fff; border-radius:4px; border:1px solid #555;'><div style='font-size:0.75rem; margin-top:2px;'>No.{c_idx+1}</div></div>"
                                 cand_html += "</div>"
                                 st.markdown(cand_html, unsafe_allow_html=True)
-                                
                                 c1, c2 = st.columns([2, 1])
                                 with c1:
                                     sel_idx = st.radio("番号", options=range(1, len(candidates)+1), horizontal=True, label_visibility="collapsed", key=f"rad_{item['code']}")
@@ -604,7 +597,6 @@ if st.session_state.generated:
                                 st.write("---")
                             else:
                                 st.info("💡 他の候補画像が見つかりませんでした。")
-
                         st.markdown(f"<div class='no-print' style='margin-bottom:8px;'><a href='https://www.google.com/search?tbm=isch&q=adidas+{item['code']}' target='_blank'>🌐 Google画像検索を開く</a></div>", unsafe_allow_html=True)
                         new_u = st.text_input("URLを手動貼付", value=item.get("manual_url", ""), key=f"inp_{item['code']}")
                         if new_u != item.get("manual_url"):
