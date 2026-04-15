@@ -239,7 +239,7 @@ def confirm_reset():
 
 def generate_html_report(items):
     now_str = datetime.datetime.now().strftime("%Y年%m月%d日 %H:%M")
-    html_content = f"""<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>カタログ出力</title><style>body{{font-family:sans-serif;background:#fff;padding:20px;}} .grid{{display:grid;grid-template-columns:repeat(5, 1fr);gap:10px;}} .card{{border:1px solid #eee;padding:10px;border-radius:5px;break-inside:avoid;}} .img-box{{height:150px;display:flex;justify(content):center;align-items:center;}} img{{max-height:100%;max-width:100%;object-fit:contain;}} .t{{font-weight:bold;font-size:0.8rem;margin:5px 0;}} .d{{font-size:0.65rem;color:#666;}}</style></head><body><h3>📦 商品カタログ ({len(items)}件)</h3><div class="grid">"""
+    html_content = f"""<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>カタログ出力</title><style>body{{font-family:sans-serif;background:#fff;padding:20px;}} .grid{{display:grid;grid-template-columns:repeat(5, 1fr);gap:10px;}} .card{{border:1px solid #eee;padding:10px;border-radius:5px;break-inside:avoid;}} .img-box{{height:150px;display:flex;justify-content:center;align-items:center;}} img{{max-height:100%;max-width:100%;object-fit:contain;}} .t{{font-weight:bold;font-size:0.8rem;margin:5px 0;}} .d{{font-size:0.65rem;color:#666;}}</style></head><body><h3>📦 商品カタログ ({len(items)}件)</h3><div class="grid">"""
     for item in items:
         u = item.get("manual_url") or item.get("auto_url") or ""
         if item.get("mode") == "MKD":
@@ -361,7 +361,7 @@ with st.sidebar:
     
     if st.session_state.generated:
         st.subheader("🎯 絞り込み")
-        # 🌟 ひとつ前の仕様に基づき復活
+        
         is_new_only = st.checkbox("✨ 新規入荷のみ (入荷リスト用)", key="new_only_toggle")
 
         items = st.session_state.catalog_items
@@ -420,7 +420,6 @@ if not st.session_state.generated:
                         name_col = st.selectbox("Name", columns, index=guess_column_index(columns, ['商品名称', '名称', 'name', 'item', 'description'], exclude=['size', 'サイズ', '店舗', 'store']))
                         qty_col = st.selectbox("Qty", ["(なし)"] + columns, index=guess_column_index(columns, ['qty', '数量'], exclude=['inv qty'])+1)
                     with c3:
-                        # 🌟 BSの自動検出が失敗した場合、デフォルトで「(なし)」を選ぶように修正 (default_idx=-1)
                         bs_col = st.selectbox("BS (カテゴリー)", ["(なし)"] + columns, index=guess_column_index(columns, ['bs', 'category'], exclude=['size', 'サイズ', 'j/'], default_idx=-1)+1)
                         status_col = st.selectbox("Status", ["(なし)"] + columns, index=guess_column_index(columns, ['inv qty', 'status', 'ステータス'], default_idx=-1)+1)
 
@@ -448,25 +447,34 @@ if not st.session_state.generated:
                     with c3:
                         qty_col = st.selectbox("数量", columns, index=guess_column_index(columns, ['inv qty', 'qty']))
                         date_col = st.selectbox("MKD/MKU Start Date", columns, index=guess_column_index(columns, ['mkd/mku start date', 'date']))
-                        # 🌟 こちらもBSを「(なし)」デフォルトに修正
                         bs_col = st.selectbox("BS (カテゴリー)", ["(なし)"] + columns, index=guess_column_index(columns, ['business segment', 'bs'], exclude=['size', 'サイズ', 'j/'], default_idx=-1)+1)
 
             if st.button("カタログ作成開始", type="primary", use_container_width=True):
                 display_df = df[df[code_col].astype(str).str.strip() != ""]
                 
                 if list_mode == "入荷リスト":
-                    agg_sizes, agg_qtys = {}, {}
+                    agg_sizes, agg_qtys, agg_is_new = {}, {}, {}
+                    
                     for code, group in display_df.groupby(code_col):
                         code_str = str(code).strip()
                         size_dict, total_qty = {}, 0
+                        is_all_new = True  # 🌟 ここが新しい厳格判定ロジック
+                        
                         for _, row in group.iterrows():
                             s_val, q_val = str(row[size_col]).strip() if size_col != "(なし)" else "", str(row[qty_col]).strip() if qty_col != "(なし)" else "0"
                             try: q_num = float(q_val)
                             except: q_num = 0
                             total_qty += q_num
                             if s_val: size_dict[s_val] = size_dict.get(s_val, 0) + q_num
+                            
+                            # 🌟 すべてのサイズにおいてステータスがエラーか空白かをチェック
+                            stat_val = str(row[status_col]).strip().upper() if status_col != "(なし)" else ""
+                            if stat_val not in ["#N/A", "#REF!", "NAN", ""]:
+                                is_all_new = False
+                                
                         agg_sizes[code_str] = ", ".join([f"{s}({int(q) if q==int(q) else q})" for s, q in size_dict.items()])
                         agg_qtys[code_str] = str(int(total_qty) if total_qty == int(total_qty) else total_qty)
+                        agg_is_new[code_str] = is_all_new
 
                     display_df = display_df.drop_duplicates(subset=[code_col])
                     st.info(f"自動検索中... ({len(display_df)}件)")
@@ -479,8 +487,9 @@ if not st.session_state.generated:
                         urls = get_best_images(code, name)
                         top_url = urls[0] if urls else None
                         return idx, {"mode": "入荷", "code": code, "name": name, "bs": str(row[bs_col]) if bs_col != "(なし)" else "",
-                                   "size": agg_sizes.get(code, ""), "qty": agg_qtys.get(code, ""),
+                                   "size": agg_sizes.get(code, ""), "qty": agg_qtys.get(code, "0"),
                                    "status": str(row[status_col]) if status_col != "(なし)" else "",
+                                   "is_new": agg_is_new.get(code, False), # 🌟 保存データに新規判定結果を含める
                                    "auto_url": top_url, "auto_urls": urls, "manual_url": ""}
                 
                 elif list_mode == "MKDリスト":
@@ -531,8 +540,9 @@ if st.session_state.generated:
     if sel_bs:
         filtered = [i for i in filtered if i["bs"] in sel_bs]
     
+    # 🌟 新規入荷のみをONにした場合、厳格判定ロジック(is_new)を参照する
     if is_new_only:
-        filtered = [i for i in filtered if str(i.get("status", "")).strip().upper() in ["#N/A", "#REF!", "NAN", ""]]
+        filtered = [i for i in filtered if i.get("is_new", str(i.get("status", "")).strip().upper() in ["#N/A", "#REF!", "NAN", ""])]
 
     total_q = sum([float(i.get("qty",0)) if i.get("qty") else 0 for i in filtered])
     
