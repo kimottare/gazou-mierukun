@@ -251,14 +251,15 @@ def generate_html_report(items):
     html_content += f"</div><p style='text-align:center;font-size:0.6rem;'>出力:{now_str}</p></body></html>"
     return html_content
 
-# --- 🔍 検索ロジック（完全に固定・変更なし） ---
+# --- 🔍 究極の検索ロジック（複数候補取得機能） ---
 def is_valid_adidas_img(url):
     keywords = ["adidas", "yimg", "bing", "gstatic", "shop-adidas", "mm-adidas"]
     return any(k in url.lower() for k in keywords)
 
-def scrape_bing_high_res_image(query, code):
+def scrape_bing_high_res_images(query, code, limit=5):
     url = f"https://www.bing.com/images/search?q={query}"
     headers = {"User-Agent": "Mozilla/5.0"}
+    res_urls = []
     try:
         res = requests.get(url, headers=headers, timeout=5)
         soup = BeautifulSoup(res.text, 'html.parser')
@@ -267,33 +268,48 @@ def scrape_bing_high_res_image(query, code):
             if m_str:
                 murl = json.loads(m_str).get('murl')
                 if murl and str(code).strip().lower() in murl.lower() and is_valid_adidas_img(murl):
-                    return murl, True
+                    if murl not in res_urls:
+                        res_urls.append(murl)
+                    if len(res_urls) >= limit: break
     except: pass
-    return None, False
+    return res_urls
 
-def get_rakuten_image(code):
-    if not RAKUTEN_APP_ID: return None, False
+def get_rakuten_images(code, limit=3):
+    if not RAKUTEN_APP_ID: return []
     url = "https://app.rakuten.co.jp/services/api/IchibaItem/Search/20220601"
-    params = {"applicationId": RAKUTEN_APP_ID, "keyword": f"adidas {code}", "hits": 3, "imageFlag": 1}
+    params = {"applicationId": RAKUTEN_APP_ID, "keyword": f"adidas {code}", "hits": 5, "imageFlag": 1}
+    res_urls = []
     try:
         res = requests.get(url, params=params, timeout=3)
         if res.status_code == 200:
             items = res.json().get("Items", [])
             for item in items:
-                img_url = item["Item"]["mediumImageUrls"][0]["imageUrl"].split("?_ex=")[0]
                 if str(code).strip().lower() in item["Item"].get("itemName", "").lower():
-                    return img_url, True
+                    # 複数画像を持っている場合も取得
+                    img_urls = item["Item"].get("mediumImageUrls", [])
+                    for img in img_urls:
+                        img_url = img["imageUrl"].split("?_ex=")[0]
+                        if img_url not in res_urls:
+                            res_urls.append(img_url)
+                        if len(res_urls) >= limit: break
+                if len(res_urls) >= limit: break
     except: pass
-    return None, False
+    return res_urls
 
-def get_best_image(code, name=""):
+def get_best_images(code, name=""):
     code_str = str(code).strip().upper()
     query = f"adidas {name} {code_str}".strip()
-    rak_url, rak_exact = get_rakuten_image(code_str)
-    if rak_exact: return {"url": rak_url, "source": "楽天公式"}
-    bing_url, bing_exact = scrape_bing_high_res_image(query, code_str)
-    if bing_exact: return {"url": bing_url, "source": "Bing検索"}
-    return None
+    r_urls = get_rakuten_images(code_str, limit=3)
+    b_urls = scrape_bing_high_res_images(query, code_str, limit=5)
+    
+    # 楽天の画像を優先して結合・重複排除
+    combined = []
+    for u in r_urls:
+        if u not in combined: combined.append(u)
+    for u in b_urls:
+        if u not in combined: combined.append(u)
+        
+    return combined[:5] # 最大5枚の候補を返す
 
 def guess_column_index(columns, keywords, default_idx=0, exclude=[]):
     for keyword in keywords:
@@ -334,7 +350,6 @@ if "generated" not in st.session_state:
 with st.sidebar:
     st.header("⚙️ 設定・管理")
     
-    # 🌟 モード切替の表記を変更
     list_mode = st.radio("📋 リストモード", ["入荷リスト", "MKDリスト"], index=0)
     st.write("---")
     
@@ -348,7 +363,6 @@ with st.sidebar:
     
     if st.session_state.generated:
         st.subheader("🎯 絞り込み")
-        # 🌟 チェックボックスの表記を変更
         is_new_only = st.checkbox("✨ 新規入荷のみ (入荷リスト用)", key="new_only_toggle")
 
         items = st.session_state.catalog_items
@@ -377,7 +391,6 @@ if not st.session_state.generated:
     
     if uploaded_file:
         try:
-            # 🌟 モードによる読み込み処理の分岐
             if list_mode == "入荷リスト":
                 if uploaded_file.name.endswith('.csv'):
                     try: df = pd.read_csv(uploaded_file, na_filter=False, dtype=str, header=None, encoding='utf-8')
@@ -440,7 +453,6 @@ if not st.session_state.generated:
             if st.button("カタログ作成開始", type="primary", use_container_width=True):
                 display_df = df[df[code_col].astype(str).str.strip() != ""]
                 
-                # 🌟 モードによるデータ処理の分岐
                 if list_mode == "入荷リスト":
                     agg_sizes, agg_qtys = {}, {}
                     for code, group in display_df.groupby(code_col):
@@ -463,11 +475,15 @@ if not st.session_state.generated:
                         idx, row = args
                         code, name = str(row[code_col]).strip(), str(row[name_col]).strip()
                         if not code or code.lower() in ['nan', 'none']: return idx, None
-                        img = get_best_image(code, name)
+                        
+                        # ★ 複数候補の取得
+                        urls = get_best_images(code, name)
+                        top_url = urls[0] if urls else None
+                        
                         return idx, {"mode": "入荷", "code": code, "name": name, "bs": str(row[bs_col]) if bs_col != "(なし)" else "",
                                    "size": agg_sizes.get(code, ""), "qty": agg_qtys.get(code, ""),
                                    "status": str(row[status_col]) if status_col != "(なし)" else "",
-                                   "auto_url": img["url"] if img else None, "source": img["source"] if img else None, "manual_url": ""}
+                                   "auto_url": top_url, "auto_urls": urls, "manual_url": ""}
                 
                 elif list_mode == "MKDリスト":
                     agg_qtys = {}
@@ -489,11 +505,15 @@ if not st.session_state.generated:
                         idx, row = args
                         code, name = str(row[code_col]).strip(), str(row[name_col]).strip()
                         if not code or code.lower() in ['nan', 'none']: return idx, None
-                        img = get_best_image(code, name)
+                        
+                        # ★ 複数候補の取得
+                        urls = get_best_images(code, name)
+                        top_url = urls[0] if urls else None
+                        
                         return idx, {"mode": "MKD", "code": code, "name": name, "bs": str(row[bs_col]) if bs_col != "(なし)" else "",
                                    "price": str(row[price_col]), "gender": str(row[gender_col]), "date": str(row[date_col]),
                                    "qty": agg_qtys.get(code, "0"),
-                                   "auto_url": img["url"] if img else None, "source": img["source"] if img else None, "manual_url": ""}
+                                   "auto_url": top_url, "auto_urls": urls, "manual_url": ""}
 
                 unsorted = []
                 with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as exe:
@@ -551,20 +571,42 @@ if st.session_state.generated:
                 else:
                     img_tag = '<div style="color:#999; font-size:0.8rem;">画像なし</div>'
                 
-                # 🌟 モードによるテキスト情報の切り替え
                 if item.get("mode") == "MKD":
                     details_html = f'Art: {item["code"]}<br>Price: {item.get("price","")}<br>Gender: {item.get("gender","")}<br>Date: {item.get("date","")}<br>Qty: {item.get("qty","0")}'
                 else:
                     details_html = f'Art: {item["code"]}<br>Size: {item.get("size","")}<br>Qty: {item.get("qty","0")}点 / {item.get("status","")}'
 
-                # 🌟 StreamlitのMarkdown誤変換を防ぐため、HTMLを必ず1行に圧縮して出力
                 html_card = f'<div class="product-card"><div class="product-image-container" style="height:{img_h};">{img_tag}</div><div class="product-info"><div class="product-title">{item["name"]}</div><div class="product-details">{details_html}</div></div></div>'
                 st.markdown(html_card, unsafe_allow_html=True)
                 
+                # 🌟 【新機能】候補から選ぶアコーディオン UI
                 if not is_print_mode:
                     with st.expander("🔍 画像変更・検索", expanded=False):
-                        st.markdown(f"<div class='no-print'><a href='https://www.google.com/search?tbm=isch&q=adidas+{item['code']}' target='_blank'>Google画像検索</a></div>", unsafe_allow_html=True)
-                        new_u = st.text_input("URL貼付", value=item.get("manual_url", ""), key=f"inp_{item['code']}")
+                        candidates = item.get("auto_urls", [])
+                        
+                        if candidates and len(candidates) > 1:
+                            st.markdown("<div style='font-size:0.75rem; color:#aaa; margin-bottom:4px;'>▼ 候補から選ぶ（左右スクロール）</div>", unsafe_allow_html=True)
+                            
+                            # 横スクロール可能なサムネイルコンテナ
+                            cand_html = "<div style='display:flex; overflow-x:auto; gap:8px; padding-bottom:8px;'>"
+                            for c_idx, c_url in enumerate(candidates):
+                                cand_html += f"<div style='flex-shrink:0; text-align:center;'><img src='{c_url}' style='height:80px; width:80px; object-fit:contain; background:#fff; border-radius:4px; border:1px solid #555;'><div style='font-size:0.75rem; margin-top:2px;'>No.{c_idx+1}</div></div>"
+                            cand_html += "</div>"
+                            st.markdown(cand_html, unsafe_allow_html=True)
+                            
+                            # 番号選択用のラジオボタンと確定ボタン
+                            c1, c2 = st.columns([2, 1])
+                            with c1:
+                                sel_idx = st.radio("番号", options=range(1, len(candidates)+1), horizontal=True, label_visibility="collapsed", key=f"rad_{item['code']}")
+                            with c2:
+                                if st.button("✓ 変更", key=f"btn_apply_{item['code']}", use_container_width=True):
+                                    item["manual_url"] = candidates[sel_idx - 1]
+                                    save_auto_save_data(st.session_state.catalog_items)
+                                    st.rerun()
+                            st.write("---")
+
+                        st.markdown(f"<div class='no-print' style='margin-bottom:8px;'><a href='https://www.google.com/search?tbm=isch&q=adidas+{item['code']}' target='_blank'>🌐 Google画像検索を開く</a></div>", unsafe_allow_html=True)
+                        new_u = st.text_input("URLを手動貼付", value=item.get("manual_url", ""), key=f"inp_{item['code']}")
                         if new_u != item.get("manual_url"):
                             item["manual_url"] = new_u
                             save_auto_save_data(st.session_state.catalog_items)
