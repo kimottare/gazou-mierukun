@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import requests
+import requests.exceptions
 from bs4 import BeautifulSoup
 import time
 import json 
@@ -22,7 +23,7 @@ def get_shared_store():
 st.set_page_config(page_title="商品画像見えるくん", layout="wide")
 
 # ==========================================
-# 🎨 究極の視認性・スマホ1列リスト強制 ＋ 画像拡大機能
+# 🎨 究極の視認性・スマホ1列リスト強制 ＋ 画像拡大 ＋ 【強制ダークモード】
 # ==========================================
 st.markdown("""
     <style>
@@ -31,6 +32,31 @@ st.markdown("""
         background-color: #0e1117 !important;
         color: #ffffff !important;
     }
+    
+    /* 🌟 文字色・フォーム同化防止パッチ（強制白文字＆ダークフォーム） */
+    .stApp p, .stApp span, .stApp label, .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6, .stApp div {
+        color: #ffffff !important;
+    }
+    
+    div[data-baseweb="input"] > div, 
+    div[data-baseweb="select"] > div,
+    div[data-baseweb="base-input"],
+    div[data-baseweb="base-input"] input {
+        background-color: #262730 !important;
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
+    }
+    
+    [data-testid="stSidebar"] {
+        background-color: #1a1c24 !important;
+    }
+
+    [data-testid="stExpander"] {
+        background-color: transparent !important;
+        border-color: #444 !important;
+    }
+
+    /* ------------------------------------- */
 
     .main-title {
         font-size: 2.8rem !important;
@@ -44,7 +70,6 @@ st.markdown("""
         padding-left: 20px;
     }
 
-    /* 🌟 カード全体と情報エリアのラッパー */
     .product-card {
         display: flex;
         flex-direction: column; 
@@ -131,6 +156,13 @@ st.markdown("""
         display: flex; justify-content: center; align-items: center;
         margin: 0; padding: 0;
     }
+    
+    /* 🌟 個別削除ボタン（btn_delete_*というキーを持つ）を赤くする */
+    .stButton>button[key^="btn_delete_"] {
+        background-color: #ff4b4b !important;
+        color: white !important;
+        border: none !important;
+    }
 
     footer {visibility: hidden;}
     [data-testid="stDecoration"] {display: none;}
@@ -146,7 +178,6 @@ st.markdown("""
             margin-top: 1rem !important;
         }
 
-        /* 1カラム（縦1列）リストに強制 */
         div[data-testid="stHorizontalBlock"] {
             display: flex !important;
             flex-direction: column !important; 
@@ -160,7 +191,6 @@ st.markdown("""
             border-bottom: 1px solid rgba(255, 255, 255, 0.1); 
         }
 
-        /* 横並びレイアウトに変更 */
         .product-card {
             flex-direction: row !important;
             align-items: center;
@@ -198,8 +228,12 @@ st.markdown("""
         }
     }
 
-    /* 4. 印刷用設定 */
+    /* 4. 印刷用設定（ここは黒文字・白背景に戻す） */
     @media print {
+        html, body, [data-testid="stAppViewContainer"], .stApp { background-color: white !important; }
+        .stApp p, .stApp span, .stApp label, .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6, .stApp div {
+            color: #000000 !important;
+        }
         header, [data-testid="stSidebar"], [data-testid="stToolbar"], 
         .stButton, .stDownloadButton, [data-testid="stExpander"],
         [data-testid="stMultiSelect"], [data-testid="stCheckbox"], 
@@ -211,7 +245,6 @@ st.markdown("""
             padding: 0 !important;
             margin: 0 !important;
         }
-        body, html, [data-testid="stAppViewContainer"], .stApp { background-color: white !important; }
         .product-title { color: #000 !important; text-shadow: none !important; font-size: 0.85rem; }
         .product-details { color: #333 !important; text-shadow: none !important; font-size: 0.65rem; }
         .product-image-container { border: 1px solid #aaa !important; box-shadow: none !important; }
@@ -222,7 +255,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 削除確認ダイアログ
+# データの全削除確認ダイアログ
 # ==========================================
 @st.dialog("データの全消去")
 def confirm_reset():
@@ -233,6 +266,23 @@ def confirm_reset():
         st.session_state.catalog_items = []
         if os.path.exists(AUTO_SAVE_FILE): os.remove(AUTO_SAVE_FILE)
         st.query_params.clear()
+        st.rerun()
+    if c2.button("いいえ", use_container_width=True):
+        st.rerun()
+
+# ==========================================
+# 商品個別の削除確認ダイアログ
+# ==========================================
+@st.dialog("商品をリストから削除")
+def confirm_delete_product(product_code, product_name):
+    st.warning(f"本当にこの商品（Art: {product_code} - {product_name}）を削除しますか？")
+    c1, c2 = st.columns(2)
+    if c1.button("はい、削除します", type="primary", use_container_width=True):
+        # セッション状態から削除
+        items = st.session_state.catalog_items
+        st.session_state.catalog_items = [item for item in items if item['code'] != product_code]
+        # 自動保存データを更新
+        save_auto_save_data(st.session_state.catalog_items)
         st.rerun()
     if c2.button("いいえ", use_container_width=True):
         st.rerun()
@@ -467,7 +517,6 @@ if not st.session_state.generated:
                             total_qty += q_num
                             if s_val: size_dict[s_val] = size_dict.get(s_val, 0) + q_num
                             
-                            # 🌟 「完全に空白("")」を条件から除外し、#N/A, #REF!, NaN のみに限定
                             stat_val = str(row[status_col]).strip().upper() if status_col != "(なし)" else ""
                             if stat_val not in ["#N/A", "#REF!", "NAN"]:
                                 is_all_new = False
@@ -540,7 +589,6 @@ if st.session_state.generated:
     if sel_bs:
         filtered = [i for i in filtered if i["bs"] in sel_bs]
     
-    # 🌟 フィルターのフォールバック条件からも「空白("")」を除外
     if is_new_only:
         filtered = [i for i in filtered if i.get("is_new", str(i.get("status", "")).strip().upper() in ["#N/A", "#REF!", "NAN"])]
 
@@ -613,3 +661,8 @@ if st.session_state.generated:
                             item["manual_url"] = new_u
                             save_auto_save_data(st.session_state.catalog_items)
                             st.rerun()
+                            
+                        # 🌟 【UI改善】 この商品個別の削除ボタン（案1）
+                        st.markdown("---")
+                        if st.button("🗑️ この商品をリストから削除", type="primary", key=f"btn_delete_{item['code']}", use_container_width=True):
+                            confirm_delete_product(item['code'], item['name'])
