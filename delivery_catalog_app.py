@@ -471,7 +471,8 @@ if not st.session_state.generated:
                         qty_col = st.selectbox("Qty", ["(なし)"] + columns, index=guess_column_index(columns, ['qty', '数量'], exclude=['inv qty'])+1)
                     with c3:
                         bs_col = st.selectbox("BS (カテゴリー)", ["(なし)"] + columns, index=guess_column_index(columns, ['bs', 'category'], exclude=['size', 'サイズ', 'j/'], default_idx=-1)+1)
-                        status_col = st.selectbox("Status", ["(なし)"] + columns, index=guess_column_index(columns, ['inv qty', 'status', 'ステータス'], default_idx=-1)+1)
+                        # 🌟 「列12」を最優先のキーワードに追加
+                        status_col = st.selectbox("Status", ["(なし)"] + columns, index=guess_column_index(columns, ['列12', 'inv qty', 'status', 'ステータス'], default_idx=-1)+1)
 
             elif list_mode == "MKDリスト":
                 if uploaded_file.name.endswith('.csv'):
@@ -662,7 +663,6 @@ if st.session_state.generated:
                             save_auto_save_data(st.session_state.catalog_items)
                             st.rerun()
                             
-                        # 🌟 【UI改善】 この商品個別の削除ボタン（案1）
                         st.markdown("---")
                         if st.button("🗑️ この商品をリストから削除", type="primary", key=f"btn_delete_{item['code']}", use_container_width=True):
                             confirm_delete_product(item['code'], item['name'])
