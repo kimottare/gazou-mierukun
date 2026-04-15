@@ -458,7 +458,7 @@ if not st.session_state.generated:
                     for code, group in display_df.groupby(code_col):
                         code_str = str(code).strip()
                         size_dict, total_qty = {}, 0
-                        is_all_new = True  # 🌟 ここが新しい厳格判定ロジック
+                        is_all_new = True
                         
                         for _, row in group.iterrows():
                             s_val, q_val = str(row[size_col]).strip() if size_col != "(なし)" else "", str(row[qty_col]).strip() if qty_col != "(なし)" else "0"
@@ -467,9 +467,9 @@ if not st.session_state.generated:
                             total_qty += q_num
                             if s_val: size_dict[s_val] = size_dict.get(s_val, 0) + q_num
                             
-                            # 🌟 すべてのサイズにおいてステータスがエラーか空白かをチェック
+                            # 🌟 「完全に空白("")」を条件から除外し、#N/A, #REF!, NaN のみに限定
                             stat_val = str(row[status_col]).strip().upper() if status_col != "(なし)" else ""
-                            if stat_val not in ["#N/A", "#REF!", "NAN", ""]:
+                            if stat_val not in ["#N/A", "#REF!", "NAN"]:
                                 is_all_new = False
                                 
                         agg_sizes[code_str] = ", ".join([f"{s}({int(q) if q==int(q) else q})" for s, q in size_dict.items()])
@@ -489,7 +489,7 @@ if not st.session_state.generated:
                         return idx, {"mode": "入荷", "code": code, "name": name, "bs": str(row[bs_col]) if bs_col != "(なし)" else "",
                                    "size": agg_sizes.get(code, ""), "qty": agg_qtys.get(code, "0"),
                                    "status": str(row[status_col]) if status_col != "(なし)" else "",
-                                   "is_new": agg_is_new.get(code, False), # 🌟 保存データに新規判定結果を含める
+                                   "is_new": agg_is_new.get(code, False), 
                                    "auto_url": top_url, "auto_urls": urls, "manual_url": ""}
                 
                 elif list_mode == "MKDリスト":
@@ -540,9 +540,9 @@ if st.session_state.generated:
     if sel_bs:
         filtered = [i for i in filtered if i["bs"] in sel_bs]
     
-    # 🌟 新規入荷のみをONにした場合、厳格判定ロジック(is_new)を参照する
+    # 🌟 フィルターのフォールバック条件からも「空白("")」を除外
     if is_new_only:
-        filtered = [i for i in filtered if i.get("is_new", str(i.get("status", "")).strip().upper() in ["#N/A", "#REF!", "NAN", ""])]
+        filtered = [i for i in filtered if i.get("is_new", str(i.get("status", "")).strip().upper() in ["#N/A", "#REF!", "NAN"])]
 
     total_q = sum([float(i.get("qty",0)) if i.get("qty") else 0 for i in filtered])
     
