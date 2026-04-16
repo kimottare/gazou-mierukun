@@ -237,6 +237,22 @@ def confirm_reset():
     if c2.button("いいえ", use_container_width=True):
         st.rerun()
 
+# 🌟 欠落していた個別削除機能の裏側（ダイアログ）を追加
+# ==========================================
+# 商品個別の削除確認ダイアログ
+# ==========================================
+@st.dialog("商品をリストから削除")
+def confirm_delete_product(product_code, product_name):
+    st.warning(f"本当にこの商品（Art: {product_code} - {product_name}）を削除しますか？")
+    c1, c2 = st.columns(2)
+    if c1.button("はい、削除します", type="primary", use_container_width=True):
+        items = st.session_state.catalog_items
+        st.session_state.catalog_items = [item for item in items if item['code'] != product_code]
+        save_auto_save_data(st.session_state.catalog_items)
+        st.rerun()
+    if c2.button("いいえ", use_container_width=True):
+        st.rerun()
+
 def generate_html_report(items):
     now_str = datetime.datetime.now().strftime("%Y年%m月%d日 %H:%M")
     html_content = f"""<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>カタログ出力</title><style>body{{font-family:sans-serif;background:#fff;padding:20px;}} .grid{{display:grid;grid-template-columns:repeat(5, 1fr);gap:10px;}} .card{{border:1px solid #eee;padding:10px;border-radius:5px;break-inside:avoid;}} .img-box{{height:150px;display:flex;justify-content:center;align-items:center;}} img{{max-height:100%;max-width:100%;object-fit:contain;}} .t{{font-weight:bold;font-size:0.8rem;margin:5px 0;}} .d{{font-size:0.65rem;color:#666;}}</style></head><body><h3>📦 商品カタログ ({len(items)}件)</h3><div class="grid">"""
@@ -616,7 +632,7 @@ if st.session_state.generated:
                             save_auto_save_data(st.session_state.catalog_items)
                             st.rerun()
                             
-                        # 🌟 削除ボタンを expander の中に移動し、区切り線を挿入
+                        # 🌟 個別削除ボタン（expander内に配置）
                         st.markdown("---")
                         if st.button("🗑️ この商品をリストから削除", type="primary", key=f"btn_delete_{item['code']}", use_container_width=True):
                             confirm_delete_product(item['code'], item['name'])
