@@ -157,11 +157,56 @@ st.markdown("""
         margin: 0; padding: 0;
     }
     
-    /* 🌟 個別削除ボタン（btn_delete_*というキーを持つ）を赤くする */
+    /* 🌟 個別削除ボタンを赤くする */
     .stButton>button[key^="btn_delete_"] {
         background-color: #ff4b4b !important;
         color: white !important;
         border: none !important;
+    }
+    
+    /* ==========================================
+       🌟 画像選択ラジオボタンの究極カスタマイズ（丸ボタン消去＆画像ボタン化）
+       ========================================== */
+    div[role="radiogroup"][aria-label^="cand_"] {
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        padding-bottom: 12px !important;
+        gap: 12px !important;
+    }
+    div[role="radiogroup"][aria-label^="cand_"] label {
+        cursor: pointer !important;
+        padding: 4px !important;
+        border: 3px solid transparent !important;
+        border-radius: 8px !important;
+        background-color: transparent !important;
+        transition: all 0.2s ease;
+        margin: 0 !important;
+    }
+    /* ラジオボタンの丸い部分を完全に非表示 */
+    div[role="radiogroup"][aria-label^="cand_"] label div[data-baseweb="radio"] > div:first-child {
+        display: none !important;
+    }
+    /* Markdown画像のサイズを強制統一 */
+    div[role="radiogroup"][aria-label^="cand_"] label img {
+        width: 80px !important;
+        height: 80px !important;
+        min-width: 80px !important;
+        object-fit: contain !important;
+        background-color: #ffffff !important;
+        border-radius: 4px !important;
+        border: 1px solid #555 !important;
+    }
+    /* 選択されている画像の強調（青枠と発光エフェクト） */
+    div[role="radiogroup"][aria-label^="cand_"] label:has(input:checked) {
+        border-color: #3b82f6 !important;
+        background-color: rgba(59, 130, 246, 0.3) !important;
+        transform: scale(1.05);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.5);
+    }
+    /* 一部ブラウザ向けのフォールバック */
+    div[role="radiogroup"][aria-label^="cand_"] label[data-checked="true"] {
+        border-color: #3b82f6 !important;
+        background-color: rgba(59, 130, 246, 0.3) !important;
     }
 
     footer {visibility: hidden;}
@@ -278,10 +323,8 @@ def confirm_delete_product(product_code, product_name):
     st.warning(f"本当にこの商品（Art: {product_code} - {product_name}）を削除しますか？")
     c1, c2 = st.columns(2)
     if c1.button("はい、削除します", type="primary", use_container_width=True):
-        # セッション状態から削除
         items = st.session_state.catalog_items
         st.session_state.catalog_items = [item for item in items if item['code'] != product_code]
-        # 自動保存データを更新
         save_auto_save_data(st.session_state.catalog_items)
         st.rerun()
     if c2.button("いいえ", use_container_width=True):
@@ -471,7 +514,6 @@ if not st.session_state.generated:
                         qty_col = st.selectbox("Qty", ["(なし)"] + columns, index=guess_column_index(columns, ['qty', '数量'], exclude=['inv qty'])+1)
                     with c3:
                         bs_col = st.selectbox("BS (カテゴリー)", ["(なし)"] + columns, index=guess_column_index(columns, ['bs', 'category'], exclude=['size', 'サイズ', 'j/'], default_idx=-1)+1)
-                        # 🌟 「列12」を最優先のキーワードに追加
                         status_col = st.selectbox("Status", ["(なし)"] + columns, index=guess_column_index(columns, ['列12', 'inv qty', 'status', 'ステータス'], default_idx=-1)+1)
 
             elif list_mode == "MKDリスト":
@@ -639,20 +681,24 @@ if st.session_state.generated:
                         else:
                             candidates = item.get("auto_urls", [])
                             if candidates:
-                                st.markdown("<div style='font-size:0.75rem; color:#aaa; margin-bottom:4px;'>▼ 候補から選ぶ（左右スクロール）</div>", unsafe_allow_html=True)
-                                cand_html = "<div style='display:flex; overflow-x:auto; gap:8px; padding-bottom:8px;'>"
-                                for c_idx, c_url in enumerate(candidates):
-                                    cand_html += f"<div style='flex-shrink:0; text-align:center;'><img src='{c_url}' style='height:80px; width:80px; object-fit:contain; background:#fff; border-radius:4px; border:1px solid #555;'><div style='font-size:0.75rem; margin-top:2px;'>No.{c_idx+1}</div></div>"
-                                cand_html += "</div>"
-                                st.markdown(cand_html, unsafe_allow_html=True)
-                                c1, c2 = st.columns([2, 1])
-                                with c1:
-                                    sel_idx = st.radio("番号", options=range(1, len(candidates)+1), horizontal=True, label_visibility="collapsed", key=f"rad_{item['code']}")
-                                with c2:
-                                    if st.button("✓ 変更", key=f"btn_apply_{item['code']}", use_container_width=True):
-                                        item["manual_url"] = candidates[sel_idx - 1]
-                                        save_auto_save_data(st.session_state.catalog_items)
-                                        st.rerun()
+                                st.markdown("<div style='font-size:0.75rem; color:#aaa; margin-bottom:4px;'>▼ 写真を直接タップして選択</div>", unsafe_allow_html=True)
+                                
+                                # 🌟 UI改善：丸いラジオボタンを消し、画像自体をタップする仕組み
+                                options = [f"![cand]({c_url.replace('(', '%28').replace(')', '%29')})" for c_url in candidates]
+                                
+                                sel_idx_str = st.radio(
+                                    f"cand_{item['code']}", 
+                                    options=options, 
+                                    horizontal=True, 
+                                    label_visibility="collapsed", 
+                                    key=f"rad_{item['code']}"
+                                )
+                                
+                                if st.button("✓ この画像に変更する", key=f"btn_apply_{item['code']}", use_container_width=True):
+                                    sel_idx = options.index(sel_idx_str)
+                                    item["manual_url"] = candidates[sel_idx]
+                                    save_auto_save_data(st.session_state.catalog_items)
+                                    st.rerun()
                                 st.write("---")
                             else:
                                 st.info("💡 他の候補画像が見つかりませんでした。")
