@@ -237,7 +237,6 @@ def confirm_reset():
     if c2.button("いいえ", use_container_width=True):
         st.rerun()
 
-# 🌟 欠落していた個別削除機能の裏側（ダイアログ）を追加
 # ==========================================
 # 商品個別の削除確認ダイアログ
 # ==========================================
@@ -252,6 +251,21 @@ def confirm_delete_product(product_code, product_name):
         st.rerun()
     if c2.button("いいえ", use_container_width=True):
         st.rerun()
+
+# 🌟 Excel日付の揺れを正規化（YYYY/MM/DD）する関数
+def format_date(d_str):
+    if pd.isna(d_str) or str(d_str).strip() in ["", "nan", "NaT", "None"]:
+        return "未定"
+    s = str(d_str).strip()
+    try:
+        # Excelのシリアル値（数値）だった場合の処理
+        if s.replace('.', '', 1).isdigit():
+            return (datetime.datetime(1899, 12, 30) + datetime.timedelta(days=float(s))).strftime('%Y/%m/%d')
+        # 標準的な日付フォーマットのパース
+        return pd.to_datetime(s).strftime('%Y/%m/%d')
+    except:
+        # パースに失敗した場合は、時間部分だけ削って返す
+        return s.split(" ")[0]
 
 def generate_html_report(items):
     now_str = datetime.datetime.now().strftime("%Y年%m月%d日 %H:%M")
@@ -375,12 +389,23 @@ with st.sidebar:
 
     st.write("---")
     
+    # グローバルなフィルター変数の初期化（エラー回避用）
+    sel_bs = []
+    sel_dates = []
+    is_new_only = False
+    
     if st.session_state.generated:
         st.subheader("🎯 絞り込み")
-        
-        is_new_only = st.checkbox("✨ 新規入荷のみ (入荷リスト用)", key="new_only_toggle")
-
         items = st.session_state.catalog_items
+        
+        # 🌟 データの中身を見て、今どのモードのリストを作ったかを判定
+        is_mkd_data = any(i.get("mode") == "MKD" for i in items)
+        is_arr_data = any(i.get("mode") == "入荷" for i in items)
+        
+        # 🌟 入荷リストの時だけ「新規入荷のみ」トグルを表示
+        if is_arr_data:
+            is_new_only = st.checkbox("✨ 新規入荷のみ", key="new_only_toggle")
+
         unique_bs = sorted(list(set([i["bs"] for i in items if i.get("bs")])))
         
         def set_all_bs(state):
@@ -390,11 +415,18 @@ with st.sidebar:
         c_btn1.button("全選択", on_click=set_all_bs, args=(True,), use_container_width=True)
         c_btn2.button("全解除", on_click=set_all_bs, args=(False,), use_container_width=True)
         
-        sel_bs = []
         if unique_bs:
             with st.container(height=200):
                 for b in unique_bs:
                     if st.checkbox(b, key=f"chk_{b}"): sel_bs.append(b)
+        
+        # 🌟 MKDリストの時だけ「開始日フィルター」を表示
+        if is_mkd_data:
+            unique_dates = sorted(list(set([i.get("date", "") for i in items if i.get("date") and i.get("date") != "未定"])))
+            if unique_dates:
+                st.write("---")
+                st.markdown("<div style='font-size:0.85rem; font-weight:bold; margin-bottom:5px;'>📅 MKD開始日で絞り込む</div>", unsafe_allow_html=True)
+                sel_dates = st.multiselect("MKD開始日で絞り込む", unique_dates, default=[], placeholder="すべて表示（選択で絞り込み）", label_visibility="collapsed")
         
         st.write("---")
         if st.button("🗑️ リセット", type="secondary", use_container_width=True):
@@ -483,7 +515,6 @@ if not st.session_state.generated:
                             total_qty += q_num
                             if s_val: size_dict[s_val] = size_dict.get(s_val, 0) + q_num
                             
-                            # 🌟 「完全に空白("")」を条件から除外し、#N/A, #REF!, NaN のみに限定
                             stat_val = str(row[status_col]).strip().upper() if status_col != "(なし)" else ""
                             if stat_val not in ["#N/A", "#REF!", "NAN"]:
                                 is_all_new = False
@@ -530,8 +561,9 @@ if not st.session_state.generated:
                         if not code or code.lower() in ['nan', 'none']: return idx, None
                         urls = get_best_images(code, name)
                         top_url = urls[0] if urls else None
+                        # 🌟 日付を正規化して保存
                         return idx, {"mode": "MKD", "code": code, "name": name, "bs": str(row[bs_col]) if bs_col != "(なし)" else "",
-                                   "price": str(row[price_col]), "gender": str(row[gender_col]), "date": str(row[date_col]),
+                                   "price": str(row[price_col]), "gender": str(row[gender_col]), "date": format_date(row[date_col]),
                                    "qty": agg_qtys.get(code, "0"),
                                    "auto_url": top_url, "auto_urls": urls, "manual_url": ""}
 
@@ -553,10 +585,15 @@ if st.session_state.generated:
     items = st.session_state.catalog_items
     filtered = items
     
+    # 🌟 BSフィルター
     if sel_bs:
-        filtered = [i for i in filtered if i["bs"] in sel_bs]
+        filtered = [i for i in filtered if i.get("bs") in sel_bs]
+        
+    # 🌟 MKD開始日フィルター（選択されている場合のみ絞り込み）
+    if sel_dates:
+        filtered = [i for i in filtered if i.get("date") in sel_dates]
     
-    # 🌟 フィルターのフォールバック条件からも「空白("")」を除外
+    # 🌟 新規入荷フィルター
     if is_new_only:
         filtered = [i for i in filtered if i.get("is_new", str(i.get("status", "")).strip().upper() in ["#N/A", "#REF!", "NAN"])]
 
