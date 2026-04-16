@@ -23,7 +23,7 @@ def get_shared_store():
 st.set_page_config(page_title="商品画像見えるくん", layout="wide")
 
 # ==========================================
-# 🎨 究極の視認性・スマホ1列リスト強制 ＋ 画像拡大 ＋ 【強制ダークモード】
+# 🎨 究極の視認性 ＋ 強制ダークモード ＋ 直感画像ピッカー
 # ==========================================
 st.markdown("""
     <style>
@@ -33,7 +33,7 @@ st.markdown("""
         color: #ffffff !important;
     }
     
-    /* 🌟 文字色・フォーム同化防止パッチ（強制白文字＆ダークフォーム） */
+    /* 🌟 文字色・フォーム同化防止パッチ */
     .stApp p, .stApp span, .stApp label, .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6, .stApp div {
         color: #ffffff !important;
     }
@@ -157,56 +157,54 @@ st.markdown("""
         margin: 0; padding: 0;
     }
     
-    /* 🌟 個別削除ボタンを赤くする */
-    .stButton>button[key^="btn_delete_"] {
-        background-color: #ff4b4b !important;
-        color: white !important;
-        border: none !important;
-    }
-    
     /* ==========================================
-       🌟 画像選択ラジオボタンの究極カスタマイズ（丸ボタン消去＆画像ボタン化）
+       🌟 画像選択ラジオボタンの究極カスタマイズ（巨大化＆青枠発光）
        ========================================== */
+    /* 横スクロールエリアのゆとり確保 */
     div[role="radiogroup"][aria-label^="cand_"] {
         flex-wrap: nowrap !important;
         overflow-x: auto !important;
-        padding-bottom: 12px !important;
-        gap: 12px !important;
+        padding: 10px 10px 20px 10px !important; 
+        gap: 20px !important;
     }
-    div[role="radiogroup"][aria-label^="cand_"] label {
-        cursor: pointer !important;
-        padding: 4px !important;
-        border: 3px solid transparent !important;
-        border-radius: 8px !important;
-        background-color: transparent !important;
-        transition: all 0.2s ease;
-        margin: 0 !important;
-    }
+    
     /* ラジオボタンの丸い部分を完全に非表示 */
-    div[role="radiogroup"][aria-label^="cand_"] label div[data-baseweb="radio"] > div:first-child {
+    div[role="radiogroup"][aria-label^="cand_"] label div[data-baseweb="radio"] {
         display: none !important;
     }
-    /* Markdown画像のサイズを強制統一 */
+    
+    div[role="radiogroup"][aria-label^="cand_"] label {
+        cursor: pointer !important;
+        margin: 0 !important;
+    }
+
+    /* 画像の巨大化と正方形キープ */
     div[role="radiogroup"][aria-label^="cand_"] label img {
-        width: 80px !important;
-        height: 80px !important;
-        min-width: 80px !important;
+        width: 150px !important;
+        height: 150px !important;
+        min-width: 150px !important;
         object-fit: contain !important;
         background-color: #ffffff !important;
-        border-radius: 4px !important;
-        border: 1px solid #555 !important;
+        border-radius: 8px !important;
+        border: 2px solid #444 !important;
+        padding: 4px;
+        transition: all 0.2s ease-in-out;
     }
-    /* 選択されている画像の強調（青枠と発光エフェクト） */
-    div[role="radiogroup"][aria-label^="cand_"] label:has(input:checked) {
-        border-color: #3b82f6 !important;
-        background-color: rgba(59, 130, 246, 0.3) !important;
+
+    /* 選択されている画像の強烈な強調（青枠と発光エフェクト） */
+    div[role="radiogroup"][aria-label^="cand_"] label:has(input:checked) img {
+        border: 4px solid #3b82f6 !important;
+        background-color: #e0f2fe !important; /* アディダスの白背景に合う薄いブルー */
+        box-shadow: 0 0 20px rgba(59, 130, 246, 0.9) !important;
         transform: scale(1.05);
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.5);
     }
-    /* 一部ブラウザ向けのフォールバック */
-    div[role="radiogroup"][aria-label^="cand_"] label[data-checked="true"] {
-        border-color: #3b82f6 !important;
-        background-color: rgba(59, 130, 246, 0.3) !important;
+
+    /* 一部ブラウザ向けのフォールバック（:has非対応用） */
+    div[role="radiogroup"][aria-label^="cand_"] label[data-checked="true"] img {
+        border: 4px solid #3b82f6 !important;
+        background-color: #e0f2fe !important;
+        box-shadow: 0 0 20px rgba(59, 130, 246, 0.9) !important;
+        transform: scale(1.05);
     }
 
     footer {visibility: hidden;}
@@ -421,10 +419,13 @@ def save_auto_save_data(items):
 # ==========================================
 st.markdown('<div class="main-title">📦 商品画像見えるくん</div>', unsafe_allow_html=True)
 
+# 🌟 スマホ共有用URLからのアクセスかどうかを判定（共有時は編集機能を隠す）
+is_shared_view = "sid" in st.query_params
+
 if "generated" not in st.session_state:
     st.session_state.catalog_items = []
     st.session_state.generated = False
-    if "sid" in st.query_params:
+    if is_shared_view:
         try:
             sid = st.query_params["sid"]
             if sid in get_shared_store():
@@ -473,9 +474,11 @@ with st.sidebar:
                 for b in unique_bs:
                     if st.checkbox(b, key=f"chk_{b}"): sel_bs.append(b)
         
-        st.write("---")
-        if st.button("🗑️ リセット", type="secondary", use_container_width=True):
-            confirm_reset()
+        # 共有モード中は誤って消去しないようリセットボタンを隠す
+        if not is_shared_view:
+            st.write("---")
+            if st.button("🗑️ リセット", type="secondary", use_container_width=True):
+                confirm_reset()
 
 if not st.session_state.generated:
     st.subheader(f"📝 新規リストを作成 ({list_mode})")
@@ -514,6 +517,7 @@ if not st.session_state.generated:
                         qty_col = st.selectbox("Qty", ["(なし)"] + columns, index=guess_column_index(columns, ['qty', '数量'], exclude=['inv qty'])+1)
                     with c3:
                         bs_col = st.selectbox("BS (カテゴリー)", ["(なし)"] + columns, index=guess_column_index(columns, ['bs', 'category'], exclude=['size', 'サイズ', 'j/'], default_idx=-1)+1)
+                        # 🌟 「列12」を最優先で自動選択
                         status_col = st.selectbox("Status", ["(なし)"] + columns, index=guess_column_index(columns, ['列12', 'inv qty', 'status', 'ステータス'], default_idx=-1)+1)
 
             elif list_mode == "MKDリスト":
@@ -560,6 +564,7 @@ if not st.session_state.generated:
                             total_qty += q_num
                             if s_val: size_dict[s_val] = size_dict.get(s_val, 0) + q_num
                             
+                            # 🌟 空白("")は除外する厳格な新規判定ルール
                             stat_val = str(row[status_col]).strip().upper() if status_col != "(なし)" else ""
                             if stat_val not in ["#N/A", "#REF!", "NAN"]:
                                 is_all_new = False
@@ -674,18 +679,19 @@ if st.session_state.generated:
                 html_card = f'<div class="product-card"><div class="product-image-container" style="height:{img_h};">{img_tag}</div><div class="product-info"><div class="product-title">{item["name"]}</div><div class="product-details">{details_html}</div></div></div>'
                 st.markdown(html_card, unsafe_allow_html=True)
                 
-                if not is_print_mode:
+                # 🌟 共有モード（スマホ閲覧時）ではない場合のみ、編集ツールを表示する
+                if not is_print_mode and not is_shared_view:
                     with st.expander("🔍 画像変更・検索", expanded=False):
                         if "auto_urls" not in item:
                             st.warning("⚠️ 過去のデータです。候補画像機能を使うには、リセットしてリストを再作成してください。")
                         else:
                             candidates = item.get("auto_urls", [])
                             if candidates:
-                                st.markdown("<div style='font-size:0.75rem; color:#aaa; margin-bottom:4px;'>▼ 写真を直接タップして選択</div>", unsafe_allow_html=True)
+                                st.markdown("<div style='font-size:0.9rem; color:#aaa; margin-bottom:10px;'>▼ 写真を直接タップして選択</div>", unsafe_allow_html=True)
                                 
-                                # 🌟 UI改善：丸いラジオボタンを消し、画像自体をタップする仕組み
                                 options = [f"![cand]({c_url.replace('(', '%28').replace(')', '%29')})" for c_url in candidates]
                                 
+                                # ラジオボタンを画像化
                                 sel_idx_str = st.radio(
                                     f"cand_{item['code']}", 
                                     options=options, 
@@ -694,7 +700,7 @@ if st.session_state.generated:
                                     key=f"rad_{item['code']}"
                                 )
                                 
-                                if st.button("✓ この画像に変更する", key=f"btn_apply_{item['code']}", use_container_width=True):
+                                if st.button("✓ この画像に変更する", type="primary", key=f"btn_apply_{item['code']}", use_container_width=True):
                                     sel_idx = options.index(sel_idx_str)
                                     item["manual_url"] = candidates[sel_idx]
                                     save_auto_save_data(st.session_state.catalog_items)
@@ -709,6 +715,6 @@ if st.session_state.generated:
                             save_auto_save_data(st.session_state.catalog_items)
                             st.rerun()
                             
-                        st.markdown("---")
-                        if st.button("🗑️ この商品をリストから削除", type="primary", key=f"btn_delete_{item['code']}", use_container_width=True):
-                            confirm_delete_product(item['code'], item['name'])
+                    st.markdown("---")
+                    if st.button("🗑️ この商品をリストから削除", type="primary", key=f"btn_delete_{item['code']}", use_container_width=True):
+                        confirm_delete_product(item['code'], item['name'])
