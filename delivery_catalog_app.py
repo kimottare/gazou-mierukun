@@ -467,6 +467,7 @@ if not st.session_state.generated:
                             total_qty += q_num
                             if s_val: size_dict[s_val] = size_dict.get(s_val, 0) + q_num
                             
+                            # 🌟 「完全に空白("")」を条件から除外し、#N/A, #REF!, NaN のみに限定
                             stat_val = str(row[status_col]).strip().upper() if status_col != "(なし)" else ""
                             if stat_val not in ["#N/A", "#REF!", "NAN"]:
                                 is_all_new = False
@@ -539,6 +540,7 @@ if st.session_state.generated:
     if sel_bs:
         filtered = [i for i in filtered if i["bs"] in sel_bs]
     
+    # 🌟 フィルターのフォールバック条件からも「空白("")」を除外
     if is_new_only:
         filtered = [i for i in filtered if i.get("is_new", str(i.get("status", "")).strip().upper() in ["#N/A", "#REF!", "NAN"])]
 
@@ -581,7 +583,9 @@ if st.session_state.generated:
                 html_card = f'<div class="product-card"><div class="product-image-container" style="height:{img_h};">{img_tag}</div><div class="product-info"><div class="product-title">{item["name"]}</div><div class="product-details">{details_html}</div></div></div>'
                 st.markdown(html_card, unsafe_allow_html=True)
                 
-                if not is_print_mode:
+                # 🌟 共有モード（スマホ閲覧時）ではない場合のみ、編集ツールを表示する
+                is_shared_view = "sid" in st.query_params
+                if not is_print_mode and not is_shared_view:
                     with st.expander("🔍 画像変更・検索", expanded=False):
                         if "auto_urls" not in item:
                             st.warning("⚠️ 過去のデータです。候補画像機能を使うには、リセットしてリストを再作成してください。")
@@ -611,3 +615,8 @@ if st.session_state.generated:
                             item["manual_url"] = new_u
                             save_auto_save_data(st.session_state.catalog_items)
                             st.rerun()
+                            
+                        # 🌟 削除ボタンを expander の中に移動し、区切り線を挿入
+                        st.markdown("---")
+                        if st.button("🗑️ この商品をリストから削除", type="primary", key=f"btn_delete_{item['code']}", use_container_width=True):
+                            confirm_delete_product(item['code'], item['name'])
