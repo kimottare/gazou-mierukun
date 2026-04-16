@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import requests
-import requests.exceptions
 from bs4 import BeautifulSoup
 import time
 import json 
@@ -23,7 +22,7 @@ def get_shared_store():
 st.set_page_config(page_title="商品画像見えるくん", layout="wide")
 
 # ==========================================
-# 🎨 究極の視認性 ＋ 強制ダークモード ＋ 直感画像ピッカー
+# 🎨 究極の視認性・スマホ1列リスト強制 ＋ 画像拡大機能
 # ==========================================
 st.markdown("""
     <style>
@@ -32,31 +31,6 @@ st.markdown("""
         background-color: #0e1117 !important;
         color: #ffffff !important;
     }
-    
-    /* 🌟 文字色・フォーム同化防止パッチ */
-    .stApp p, .stApp span, .stApp label, .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6, .stApp div {
-        color: #ffffff !important;
-    }
-    
-    div[data-baseweb="input"] > div, 
-    div[data-baseweb="select"] > div,
-    div[data-baseweb="base-input"],
-    div[data-baseweb="base-input"] input {
-        background-color: #262730 !important;
-        color: #ffffff !important;
-        -webkit-text-fill-color: #ffffff !important;
-    }
-    
-    [data-testid="stSidebar"] {
-        background-color: #1a1c24 !important;
-    }
-
-    [data-testid="stExpander"] {
-        background-color: transparent !important;
-        border-color: #444 !important;
-    }
-
-    /* ------------------------------------- */
 
     .main-title {
         font-size: 2.8rem !important;
@@ -70,6 +44,7 @@ st.markdown("""
         padding-left: 20px;
     }
 
+    /* 🌟 カード全体と情報エリアのラッパー */
     .product-card {
         display: flex;
         flex-direction: column; 
@@ -156,56 +131,6 @@ st.markdown("""
         display: flex; justify-content: center; align-items: center;
         margin: 0; padding: 0;
     }
-    
-    /* ==========================================
-       🌟 画像選択ラジオボタンの究極カスタマイズ（巨大化＆青枠発光）
-       ========================================== */
-    /* 横スクロールエリアのゆとり確保 */
-    div[role="radiogroup"][aria-label^="cand_"] {
-        flex-wrap: nowrap !important;
-        overflow-x: auto !important;
-        padding: 10px 10px 20px 10px !important; 
-        gap: 20px !important;
-    }
-    
-    /* ラジオボタンの丸い部分を完全に非表示 */
-    div[role="radiogroup"][aria-label^="cand_"] label div[data-baseweb="radio"] {
-        display: none !important;
-    }
-    
-    div[role="radiogroup"][aria-label^="cand_"] label {
-        cursor: pointer !important;
-        margin: 0 !important;
-    }
-
-    /* 画像の巨大化と正方形キープ */
-    div[role="radiogroup"][aria-label^="cand_"] label img {
-        width: 150px !important;
-        height: 150px !important;
-        min-width: 150px !important;
-        object-fit: contain !important;
-        background-color: #ffffff !important;
-        border-radius: 8px !important;
-        border: 2px solid #444 !important;
-        padding: 4px;
-        transition: all 0.2s ease-in-out;
-    }
-
-    /* 選択されている画像の強烈な強調（青枠と発光エフェクト） */
-    div[role="radiogroup"][aria-label^="cand_"] label:has(input:checked) img {
-        border: 4px solid #3b82f6 !important;
-        background-color: #e0f2fe !important; /* アディダスの白背景に合う薄いブルー */
-        box-shadow: 0 0 20px rgba(59, 130, 246, 0.9) !important;
-        transform: scale(1.05);
-    }
-
-    /* 一部ブラウザ向けのフォールバック（:has非対応用） */
-    div[role="radiogroup"][aria-label^="cand_"] label[data-checked="true"] img {
-        border: 4px solid #3b82f6 !important;
-        background-color: #e0f2fe !important;
-        box-shadow: 0 0 20px rgba(59, 130, 246, 0.9) !important;
-        transform: scale(1.05);
-    }
 
     footer {visibility: hidden;}
     [data-testid="stDecoration"] {display: none;}
@@ -221,6 +146,7 @@ st.markdown("""
             margin-top: 1rem !important;
         }
 
+        /* 1カラム（縦1列）リストに強制 */
         div[data-testid="stHorizontalBlock"] {
             display: flex !important;
             flex-direction: column !important; 
@@ -234,6 +160,7 @@ st.markdown("""
             border-bottom: 1px solid rgba(255, 255, 255, 0.1); 
         }
 
+        /* 横並びレイアウトに変更 */
         .product-card {
             flex-direction: row !important;
             align-items: center;
@@ -271,12 +198,8 @@ st.markdown("""
         }
     }
 
-    /* 4. 印刷用設定（ここは黒文字・白背景に戻す） */
+    /* 4. 印刷用設定 */
     @media print {
-        html, body, [data-testid="stAppViewContainer"], .stApp { background-color: white !important; }
-        .stApp p, .stApp span, .stApp label, .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6, .stApp div {
-            color: #000000 !important;
-        }
         header, [data-testid="stSidebar"], [data-testid="stToolbar"], 
         .stButton, .stDownloadButton, [data-testid="stExpander"],
         [data-testid="stMultiSelect"], [data-testid="stCheckbox"], 
@@ -288,6 +211,7 @@ st.markdown("""
             padding: 0 !important;
             margin: 0 !important;
         }
+        body, html, [data-testid="stAppViewContainer"], .stApp { background-color: white !important; }
         .product-title { color: #000 !important; text-shadow: none !important; font-size: 0.85rem; }
         .product-details { color: #333 !important; text-shadow: none !important; font-size: 0.65rem; }
         .product-image-container { border: 1px solid #aaa !important; box-shadow: none !important; }
@@ -298,7 +222,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# データの全削除確認ダイアログ
+# 削除確認ダイアログ
 # ==========================================
 @st.dialog("データの全消去")
 def confirm_reset():
@@ -309,21 +233,6 @@ def confirm_reset():
         st.session_state.catalog_items = []
         if os.path.exists(AUTO_SAVE_FILE): os.remove(AUTO_SAVE_FILE)
         st.query_params.clear()
-        st.rerun()
-    if c2.button("いいえ", use_container_width=True):
-        st.rerun()
-
-# ==========================================
-# 商品個別の削除確認ダイアログ
-# ==========================================
-@st.dialog("商品をリストから削除")
-def confirm_delete_product(product_code, product_name):
-    st.warning(f"本当にこの商品（Art: {product_code} - {product_name}）を削除しますか？")
-    c1, c2 = st.columns(2)
-    if c1.button("はい、削除します", type="primary", use_container_width=True):
-        items = st.session_state.catalog_items
-        st.session_state.catalog_items = [item for item in items if item['code'] != product_code]
-        save_auto_save_data(st.session_state.catalog_items)
         st.rerun()
     if c2.button("いいえ", use_container_width=True):
         st.rerun()
@@ -419,13 +328,10 @@ def save_auto_save_data(items):
 # ==========================================
 st.markdown('<div class="main-title">📦 商品画像見えるくん</div>', unsafe_allow_html=True)
 
-# 🌟 スマホ共有用URLからのアクセスかどうかを判定（共有時は編集機能を隠す）
-is_shared_view = "sid" in st.query_params
-
 if "generated" not in st.session_state:
     st.session_state.catalog_items = []
     st.session_state.generated = False
-    if is_shared_view:
+    if "sid" in st.query_params:
         try:
             sid = st.query_params["sid"]
             if sid in get_shared_store():
@@ -474,11 +380,9 @@ with st.sidebar:
                 for b in unique_bs:
                     if st.checkbox(b, key=f"chk_{b}"): sel_bs.append(b)
         
-        # 共有モード中は誤って消去しないようリセットボタンを隠す
-        if not is_shared_view:
-            st.write("---")
-            if st.button("🗑️ リセット", type="secondary", use_container_width=True):
-                confirm_reset()
+        st.write("---")
+        if st.button("🗑️ リセット", type="secondary", use_container_width=True):
+            confirm_reset()
 
 if not st.session_state.generated:
     st.subheader(f"📝 新規リストを作成 ({list_mode})")
@@ -517,8 +421,7 @@ if not st.session_state.generated:
                         qty_col = st.selectbox("Qty", ["(なし)"] + columns, index=guess_column_index(columns, ['qty', '数量'], exclude=['inv qty'])+1)
                     with c3:
                         bs_col = st.selectbox("BS (カテゴリー)", ["(なし)"] + columns, index=guess_column_index(columns, ['bs', 'category'], exclude=['size', 'サイズ', 'j/'], default_idx=-1)+1)
-                        # 🌟 「列12」を最優先で自動選択
-                        status_col = st.selectbox("Status", ["(なし)"] + columns, index=guess_column_index(columns, ['列12', 'inv qty', 'status', 'ステータス'], default_idx=-1)+1)
+                        status_col = st.selectbox("Status", ["(なし)"] + columns, index=guess_column_index(columns, ['inv qty', 'status', 'ステータス'], default_idx=-1)+1)
 
             elif list_mode == "MKDリスト":
                 if uploaded_file.name.endswith('.csv'):
@@ -564,7 +467,6 @@ if not st.session_state.generated:
                             total_qty += q_num
                             if s_val: size_dict[s_val] = size_dict.get(s_val, 0) + q_num
                             
-                            # 🌟 空白("")は除外する厳格な新規判定ルール
                             stat_val = str(row[status_col]).strip().upper() if status_col != "(なし)" else ""
                             if stat_val not in ["#N/A", "#REF!", "NAN"]:
                                 is_all_new = False
@@ -679,42 +581,33 @@ if st.session_state.generated:
                 html_card = f'<div class="product-card"><div class="product-image-container" style="height:{img_h};">{img_tag}</div><div class="product-info"><div class="product-title">{item["name"]}</div><div class="product-details">{details_html}</div></div></div>'
                 st.markdown(html_card, unsafe_allow_html=True)
                 
-                # 🌟 共有モード（スマホ閲覧時）ではない場合のみ、編集ツールを表示する
-                if not is_print_mode and not is_shared_view:
+                if not is_print_mode:
                     with st.expander("🔍 画像変更・検索", expanded=False):
                         if "auto_urls" not in item:
                             st.warning("⚠️ 過去のデータです。候補画像機能を使うには、リセットしてリストを再作成してください。")
                         else:
                             candidates = item.get("auto_urls", [])
                             if candidates:
-                                st.markdown("<div style='font-size:0.9rem; color:#aaa; margin-bottom:10px;'>▼ 写真を直接タップして選択</div>", unsafe_allow_html=True)
-                                
-                                options = [f"![cand]({c_url.replace('(', '%28').replace(')', '%29')})" for c_url in candidates]
-                                
-                                # ラジオボタンを画像化
-                                sel_idx_str = st.radio(
-                                    f"cand_{item['code']}", 
-                                    options=options, 
-                                    horizontal=True, 
-                                    label_visibility="collapsed", 
-                                    key=f"rad_{item['code']}"
-                                )
-                                
-                                if st.button("✓ この画像に変更する", type="primary", key=f"btn_apply_{item['code']}", use_container_width=True):
-                                    sel_idx = options.index(sel_idx_str)
-                                    item["manual_url"] = candidates[sel_idx]
-                                    save_auto_save_data(st.session_state.catalog_items)
-                                    st.rerun()
+                                st.markdown("<div style='font-size:0.75rem; color:#aaa; margin-bottom:4px;'>▼ 候補から選ぶ（左右スクロール）</div>", unsafe_allow_html=True)
+                                cand_html = "<div style='display:flex; overflow-x:auto; gap:8px; padding-bottom:8px;'>"
+                                for c_idx, c_url in enumerate(candidates):
+                                    cand_html += f"<div style='flex-shrink:0; text-align:center;'><img src='{c_url}' style='height:80px; width:80px; object-fit:contain; background:#fff; border-radius:4px; border:1px solid #555;'><div style='font-size:0.75rem; margin-top:2px;'>No.{c_idx+1}</div></div>"
+                                cand_html += "</div>"
+                                st.markdown(cand_html, unsafe_allow_html=True)
+                                c1, c2 = st.columns([2, 1])
+                                with c1:
+                                    sel_idx = st.radio("番号", options=range(1, len(candidates)+1), horizontal=True, label_visibility="collapsed", key=f"rad_{item['code']}")
+                                with c2:
+                                    if st.button("✓ 変更", key=f"btn_apply_{item['code']}", use_container_width=True):
+                                        item["manual_url"] = candidates[sel_idx - 1]
+                                        save_auto_save_data(st.session_state.catalog_items)
+                                        st.rerun()
                                 st.write("---")
                             else:
                                 st.info("💡 他の候補画像が見つかりませんでした。")
                         st.markdown(f"<div class='no-print' style='margin-bottom:8px;'><a href='https://www.google.com/search?tbm=isch&q=adidas+{item['code']}' target='_blank'>🌐 Google画像検索を開く</a></div>", unsafe_allow_html=True)
-                        new_u = st.text_input("URLを手持貼付", value=item.get("manual_url", ""), key=f"inp_{item['code']}")
+                        new_u = st.text_input("URLを手動貼付", value=item.get("manual_url", ""), key=f"inp_{item['code']}")
                         if new_u != item.get("manual_url"):
                             item["manual_url"] = new_u
                             save_auto_save_data(st.session_state.catalog_items)
                             st.rerun()
-                            
-                    st.markdown("---")
-                    if st.button("🗑️ この商品をリストから削除", type="primary", key=f"btn_delete_{item['code']}", use_container_width=True):
-                        confirm_delete_product(item['code'], item['name'])
