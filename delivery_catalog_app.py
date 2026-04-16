@@ -709,7 +709,7 @@ if st.session_state.generated:
                             else:
                                 st.info("💡 他の候補画像が見つかりませんでした。")
                         st.markdown(f"<div class='no-print' style='margin-bottom:8px;'><a href='https://www.google.com/search?tbm=isch&q=adidas+{item['code']}' target='_blank'>🌐 Google画像検索を開く</a></div>", unsafe_allow_html=True)
-                        new_u = st.text_input("URLを手動貼付", value=item.get("manual_url", ""), key=f"inp_{item['code']}")
+                        new_u = st.text_input("URLを手持貼付", value=item.get("manual_url", ""), key=f"inp_{item['code']}")
                         if new_u != item.get("manual_url"):
                             item["manual_url"] = new_u
                             save_auto_save_data(st.session_state.catalog_items)
