@@ -470,7 +470,8 @@ if not st.session_state.generated:
                         qty_col = st.selectbox("Qty", ["(なし)"] + columns, index=guess_column_index(columns, ['qty', '数量'], exclude=['inv qty'])+1)
                     with c3:
                         bs_col = st.selectbox("BS (カテゴリー)", ["(なし)"] + columns, index=guess_column_index(columns, ['bs', 'category'], exclude=['size', 'サイズ', 'j/'], default_idx=-1)+1)
-                        status_col = st.selectbox("Status", ["(なし)"] + columns, index=guess_column_index(columns, ['inv qty', 'status', 'ステータス'], default_idx=-1)+1)
+                        # 🌟 ここを変更: キーワードに '列12' を追加しました
+                        status_col = st.selectbox("Status", ["(なし)"] + columns, index=guess_column_index(columns, ['inv qty', 'status', 'ステータス', '列12'], default_idx=-1)+1)
 
             elif list_mode == "MKDリスト":
                 if uploaded_file.name.endswith('.csv'):
