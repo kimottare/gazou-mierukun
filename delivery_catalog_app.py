@@ -15,6 +15,9 @@ import streamlit.components.v1 as components
 RAKUTEN_APP_ID = "9fd3dd97-a071-4e2b-8579-dec02ea27217" 
 AUTO_SAVE_FILE = "auto_save_catalog.json" 
 
+# ステルス検索用のヘッダー（人間っぽく見せかける）
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
 @st.cache_resource
 def get_shared_store():
     return {}
@@ -289,10 +292,13 @@ def is_valid_adidas_img(url):
 
 def scrape_bing_high_res_images(query, code, limit=5):
     url = f"https://www.bing.com/images/search?q={query}"
-    headers = {"User-Agent": "Mozilla/5.0"}
+    # 🌟 ヘッダーを強化して人間っぽく見せかける
+    headers = {"User-Agent": USER_AGENT, "Accept-Language": "ja,en-US;q=0.9,en;q=0.8"}
     res_urls = []
     try:
-        res = requests.get(url, headers=headers, timeout=5)
+        # 🌟 タイムアウトを少し伸ばす
+        res = requests.get(url, headers=headers, timeout=10)
+        if res.status_code != 200: return []
         soup = BeautifulSoup(res.text, 'html.parser')
         for a in soup.find_all('a', class_='iusc'):
             m_str = a.get('m')
@@ -309,9 +315,11 @@ def get_rakuten_images(code, limit=3):
     if not RAKUTEN_APP_ID: return []
     url = "https://app.rakuten.co.jp/services/api/IchibaItem/Search/20220601"
     params = {"applicationId": RAKUTEN_APP_ID, "keyword": f"adidas {code}", "hits": 5, "imageFlag": 1}
+    # 🌟 楽天APIもヘッダーを付けておく
+    headers = {"User-Agent": USER_AGENT}
     res_urls = []
     try:
-        res = requests.get(url, params=params, timeout=3)
+        res = requests.get(url, params=params, headers=headers, timeout=10)
         if res.status_code == 200:
             items = res.json().get("Items", [])
             for item in items:
@@ -470,7 +478,6 @@ if not st.session_state.generated:
                         qty_col = st.selectbox("Qty", ["(なし)"] + columns, index=guess_column_index(columns, ['qty', '数量'], exclude=['inv qty'])+1)
                     with c3:
                         bs_col = st.selectbox("BS (カテゴリー)", ["(なし)"] + columns, index=guess_column_index(columns, ['bs', 'category'], exclude=['size', 'サイズ', 'j/'], default_idx=-1)+1)
-                        # 🌟 ここを変更: キーワードに '列12' を追加しました
                         status_col = st.selectbox("Status", ["(なし)"] + columns, index=guess_column_index(columns, ['inv qty', 'status', 'ステータス', '列12'], default_idx=-1)+1)
 
             elif list_mode == "MKDリスト":
