@@ -215,7 +215,8 @@ st.markdown("""
         .product-title { color: #000 !important; text-shadow: none !important; font-size: 0.85rem; }
         .product-details { color: #333 !important; text-shadow: none !important; font-size: 0.65rem; }
         .product-image-container { border: 1px solid #aaa !important; box-shadow: none !important; }
-        .product-image-container img { filter: none !important; }
+        /* 🌟 画像が薄くなるのを防ぐための強制設定 */
+        .product-image-container img { filter: none !important; opacity: 1 !important; visibility: visible !important; display: block !important; }
         .lightbox, .lightbox-toggle { display: none !important; }
     }
     </style>
@@ -523,22 +524,6 @@ if not st.session_state.generated:
                         agg_qtys[code_str] = str(int(total_qty) if total_qty == int(total_qty) else total_qty)
                         agg_is_new[code_str] = is_all_new
 
-                    display_df = display_df.drop_duplicates(subset=[code_col])
-                    st.info(f"自動検索中... ({len(display_df)}件)")
-                    p_bar = st.progress(0)
-                    
-                    def fetch_data(args):
-                        idx, row = args
-                        code, name = str(row[code_col]).strip(), str(row[name_col]).strip()
-                        if not code or code.lower() in ['nan', 'none']: return idx, None
-                        urls = get_best_images(code, name)
-                        top_url = urls[0] if urls else None
-                        return idx, {"mode": "入荷", "code": code, "name": name, "bs": str(row[bs_col]) if bs_col != "(なし)" else "",
-                                   "size": agg_sizes.get(code, ""), "qty": agg_qtys.get(code, "0"),
-                                   "status": str(row[status_col]) if status_col != "(なし)" else "",
-                                   "is_new": agg_is_new.get(code, False), 
-                                   "auto_url": top_url, "auto_urls": urls, "manual_url": ""}
-                
                 elif list_mode == "MKDリスト":
                     agg_qtys = {}
                     for code, group in display_df.groupby(code_col):
@@ -551,20 +536,26 @@ if not st.session_state.generated:
                             total_qty += q_num
                         agg_qtys[code_str] = str(int(total_qty) if total_qty == int(total_qty) else total_qty)
 
-                    display_df = display_df.drop_duplicates(subset=[code_col])
-                    st.info(f"自動検索中... ({len(display_df)}件)")
-                    p_bar = st.progress(0)
-                    
-                    def fetch_data(args):
-                        idx, row = args
-                        code, name = str(row[code_col]).strip(), str(row[name_col]).strip()
-                        if not code or code.lower() in ['nan', 'none']: return idx, None
-                        urls = get_best_images(code, name)
-                        top_url = urls[0] if urls else None
-                        # 🌟 日付を正規化して保存
+                display_df = display_df.drop_duplicates(subset=[code_col])
+                st.info(f"自動検索中... ({len(display_df)}件)")
+                p_bar = st.progress(0)
+                
+                def fetch_data(args):
+                    idx, row = args
+                    code, name = str(row[code_col]).strip(), str(row[name_col]).strip()
+                    if not code or code.lower() in ['nan', 'none']: return idx, None
+                    urls = get_best_images(code, name)
+                    top_url = urls[0] if urls else None
+                    if list_mode == "MKDリスト":
                         return idx, {"mode": "MKD", "code": code, "name": name, "bs": str(row[bs_col]) if bs_col != "(なし)" else "",
                                    "price": str(row[price_col]), "gender": str(row[gender_col]), "date": format_date(row[date_col]),
                                    "qty": agg_qtys.get(code, "0"),
+                                   "auto_url": top_url, "auto_urls": urls, "manual_url": ""}
+                    else:
+                        return idx, {"mode": "入荷", "code": code, "name": name, "bs": str(row[bs_col]) if bs_col != "(なし)" else "",
+                                   "size": agg_sizes.get(code, ""), "qty": agg_qtys.get(code, "0"),
+                                   "status": str(row[status_col]) if status_col != "(なし)" else "",
+                                   "is_new": agg_is_new.get(code, False), 
                                    "auto_url": top_url, "auto_urls": urls, "manual_url": ""}
 
                 unsorted = []
@@ -624,7 +615,8 @@ if st.session_state.generated:
                 
                 if url:
                     img_id = f"img_modal_{i}_{j}"
-                    img_tag = f'<label for="{img_id}"><img src="{url}"></label><input type="checkbox" id="{img_id}" class="lightbox-toggle"><div class="lightbox"><label for="{img_id}" class="lightbox-close-area"></label><img src="{url}"></div>'
+                    # 🌟 画像の遅延読み込みを防ぐために loading="eager" を追加
+                    img_tag = f'<label for="{img_id}"><img src="{url}" loading="eager"></label><input type="checkbox" id="{img_id}" class="lightbox-toggle"><div class="lightbox"><label for="{img_id}" class="lightbox-close-area"></label><img src="{url}" loading="eager"></div>'
                 else:
                     img_tag = '<div style="color:#999; font-size:0.8rem;">画像なし</div>'
                 
